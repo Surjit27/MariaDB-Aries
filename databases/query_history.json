@@ -118,5 +118,11 @@
     "timestamp": "2025-10-25T16:55:18.821316",
     "status": "success",
     "database": "Tesst"
+  },
+  {
+    "query": "select * from employees",
+    "timestamp": "2025-10-25T17:49:34.626332",
+    "status": "success",
+    "database": "company_db;"
   }
 ]

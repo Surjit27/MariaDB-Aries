@@ -1,9 +1,18 @@
 import tkinter as tk
 import ttkbootstrap as ttk
-from ui.components.modern_theme import ModernTheme
+import sys
+import os
 import re
 import threading
 import time
+
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from ui.components.modern_theme import ModernTheme
+from sql_engine.simple_sql_compiler import SimpleSQLCompiler
 
 class EnhancedSQLEditor:
     def __init__(self, parent, db_manager, ai_integration):
@@ -17,6 +26,10 @@ class EnhancedSQLEditor:
         self.ai_autocomplete = True
         self.autocomplete_suggestions = []
         self.suggestion_window = None
+        
+        # Initialize SQL compiler
+        self.sql_compiler = SimpleSQLCompiler()
+        
         self.create_widgets()
         
     def create_widgets(self):
@@ -41,6 +54,7 @@ class EnhancedSQLEditor:
         
         # Toolbar buttons
         self.create_toolbar_button(toolbar_frame, "▶️", "Run Query", self.run_query, "Run SQL (Ctrl+R)")
+        self.create_toolbar_button(toolbar_frame, "🔧", "Compile", self.compile_sql, "Compile SQL (Ctrl+Shift+C)")
         self.create_toolbar_button(toolbar_frame, "🧹", "Clear", self.clear_editor, "Clear Editor (Ctrl+C)")
         self.create_toolbar_button(toolbar_frame, "🤖", "AI Generate", self.generate_sql, "AI Generate (Ctrl+G)")
         self.create_toolbar_button(toolbar_frame, "💡", "Explain", self.explain_sql, "Explain SQL")
@@ -242,6 +256,11 @@ class EnhancedSQLEditor:
         # Handle Ctrl+G for AI generate
         if event.state & 0x4 and event.keysym == "g":  # Ctrl+G
             self.generate_sql()
+            return "break"
+        
+        # Handle Ctrl+Shift+C for compile
+        if event.state & 0x5 and event.keysym == "c":  # Ctrl+Shift+C
+            self.compile_sql()
             return "break"
     
     def on_click(self, event):
@@ -550,16 +569,148 @@ class EnhancedSQLEditor:
             self.status_label.configure(text="No query to run")
             return
         
-        self.status_label.configure(text="Running query...")
+        self.status_label.configure(text="Compiling and running query...")
         
-        # This would typically call the database manager to execute the query
-        # For now, just show a status message
-        self.status_label.configure(text="Query executed")
+        try:
+            # Compile the SQL query using the SQL compiler
+            compiled_query = self.sql_compiler.compile_sql(query)
+            
+            # Validate the compiled SQL
+            validation_result = self.sql_compiler.validate_sql(compiled_query)
+            
+            if not validation_result['valid']:
+                self.status_label.configure(text=f"SQL Error: {', '.join(validation_result['errors'])}")
+                return
+            
+            # Show warnings if any
+            if validation_result['warnings']:
+                self.status_label.configure(text=f"Warnings: {', '.join(validation_result['warnings'])}")
+            
+            # Execute the compiled query through the database manager
+            if self.db_manager and self.db_manager.current_db:
+                try:
+                    # Execute the query
+                    result = self.db_manager.execute_query(compiled_query)
+                    
+                    # Display results in the results viewer
+                    if hasattr(self, 'results_viewer') and self.results_viewer:
+                        self.results_viewer.display_results(result)
+                    
+                    self.status_label.configure(text="Query executed successfully")
+                    
+                    # Add to query history
+                    if hasattr(self.db_manager, 'add_to_history'):
+                        self.db_manager.add_to_history(query)
+                        
+                except Exception as e:
+                    self.status_label.configure(text=f"Database Error: {str(e)}")
+            else:
+                self.status_label.configure(text="No database selected")
+                
+        except Exception as e:
+            self.status_label.configure(text=f"Compilation Error: {str(e)}")
     
     def clear_editor(self):
         """Clear the editor."""
         self.editor.delete("1.0", tk.END)
         self.status_label.configure(text="Editor cleared")
+    
+    def compile_sql(self):
+        """Compile the SQL query and show the result."""
+        query = self.editor.get("1.0", tk.END).strip()
+        if not query:
+            self.status_label.configure(text="No query to compile")
+            return
+        
+        try:
+            # Compile the SQL query
+            compiled_query = self.sql_compiler.compile_sql(query)
+            
+            # Validate the compiled SQL
+            validation_result = self.sql_compiler.validate_sql(compiled_query)
+            
+            if not validation_result['valid']:
+                self.status_label.configure(text=f"Compilation Error: {', '.join(validation_result['errors'])}")
+                return
+            
+            # Show the compiled SQL in a new window
+            self.show_compiled_sql(compiled_query, validation_result)
+            
+        except Exception as e:
+            self.status_label.configure(text=f"Compilation Error: {str(e)}")
+    
+    def show_compiled_sql(self, compiled_sql, validation_result):
+        """Show the compiled SQL in a popup window."""
+        # Create popup window
+        popup = tk.Toplevel(self.editor)
+        popup.title("Compiled SQL")
+        popup.geometry("800x600")
+        popup.configure(bg="#1e1e1e")
+        
+        # Header frame
+        header_frame = tk.Frame(popup, bg="#1e1e1e")
+        header_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        title_label = tk.Label(header_frame, text="🔧 Compiled SQL Query", 
+                              font=("Arial", 14, "bold"), fg="#ffffff", bg="#1e1e1e")
+        title_label.pack(side=tk.LEFT)
+        
+        # Status label
+        if validation_result['warnings']:
+            status_text = f"⚠️ Warnings: {', '.join(validation_result['warnings'])}"
+            status_color = "#ffa500"
+        else:
+            status_text = "✅ Compilation successful"
+            status_color = "#00ff00"
+        
+        status_label = tk.Label(header_frame, text=status_text, 
+                              font=("Arial", 10), fg=status_color, bg="#1e1e1e")
+        status_label.pack(side=tk.RIGHT)
+        
+        # Text area for compiled SQL
+        text_frame = tk.Frame(popup, bg="#1e1e1e")
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        text_widget = tk.Text(text_frame, 
+                             font=("Consolas", 11),
+                             bg="#2d2d2d", fg="#ffffff",
+                             selectbackground="#404040", selectforeground="#ffffff",
+                             relief="flat", bd=1, wrap=tk.WORD)
+        
+        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
+        text_widget.configure(yscrollcommand=scrollbar.set)
+        
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Insert compiled SQL
+        text_widget.insert("1.0", compiled_sql)
+        text_widget.configure(state=tk.DISABLED)
+        
+        # Button frame
+        button_frame = tk.Frame(popup, bg="#1e1e1e")
+        button_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # Copy button
+        copy_btn = tk.Button(button_frame, text="📋 Copy to Editor", 
+                            command=lambda: self.copy_compiled_sql(compiled_sql, popup),
+                            bg="#007acc", fg="#ffffff", bd=0, font=("Arial", 10),
+                            activebackground="#005a9e", activeforeground="#ffffff")
+        copy_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Close button
+        close_btn = tk.Button(button_frame, text="❌ Close", 
+                             command=popup.destroy,
+                             bg="#dc3545", fg="#ffffff", bd=0, font=("Arial", 10),
+                             activebackground="#c82333", activeforeground="#ffffff")
+        close_btn.pack(side=tk.RIGHT, padx=5)
+    
+    def copy_compiled_sql(self, compiled_sql, popup):
+        """Copy the compiled SQL back to the editor."""
+        self.editor.delete("1.0", tk.END)
+        self.editor.insert("1.0", compiled_sql)
+        popup.destroy()
+        self.status_label.configure(text="Compiled SQL copied to editor")
     
     def generate_sql(self):
         """Generate SQL using AI."""

@@ -1,8 +1,16 @@
 import tkinter as tk
 import ttkbootstrap as ttk
-from ui.components.modern_theme import ModernTheme
+import sys
+import os
 from tkinter import messagebox
 import datetime
+
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from ui.components.modern_theme import ModernTheme
 
 class ModernModals:
     def __init__(self, parent, db_manager, ai_integration):

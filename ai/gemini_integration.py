@@ -7,7 +7,7 @@ class GeminiIntegration:
     def __init__(self):
         """Initialize Gemini API integration with API key."""
         # Use the provided API key
-        self.api_key = "AIzaSyAmvcfhifqrmmJ7ia_1p2m61Q1WEYzIrtY"
+        self.api_key = ""
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
         if not self.api_key:
             print("Warning: API key not available. AI features will be disabled.")
