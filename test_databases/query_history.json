@@ -1,0 +1,8 @@
+[
+  {
+    "query": "CREATE TABLE Departments (\n    dept_id INTEGER PRIMARY KEY,\n    dept_name VARCHAR(50),\n    manager_id INTEGER\n); INSERT INTO Departments VALUES\n(1, 'Human Resources', 1),\n(2, 'Engineering', 2),\n(3, 'Marketing', 3); CREATE TABLE Projects (\n    project_id INTEGER PRIMARY KEY,\n    project_name VARCHAR(100),\n    dept_id INTEGER,\n    start_date DATE,\n    end_date DATE,\n    budget DECIMAL(12,2),\n    FOREIGN KEY (dept_id) REFERENCES Departments(dept_id)\n); INSERT INTO Projects VALUES\n(1, 'Website Redesign', 3, '2023-01-15', '2023-06-30', 150000),\n(2, 'AI Research', 2, '2022-09-01', '2023-09-01', 300000)",
+    "timestamp": "2025-10-25T14:45:50.620790",
+    "status": "success",
+    "database": "fresh_test"
+  }
+]

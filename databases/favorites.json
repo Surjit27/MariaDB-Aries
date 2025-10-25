@@ -1,0 +1,20 @@
+[
+  {
+    "name": "s",
+    "query": "CREATE TABLE Orders (\n    order_id INTEGER PRIMARY KEY,\n    customer_id INTEGER,\n    order_date DATE,\n    total_amount DECIMAL(10,2),\n    status VARCHAR(20),\n    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)\n); INSERT INTO Orders VALUES\n(1, 1, '2023-05-10', 250.00, 'Shipped'),\n(2, 2, '2023-05-11', 320.50, 'Pending'),\n(3, 3, '2023-05-12', 175.25, 'Delivered'),\n(4, 4, '2023-05-13', 400.00, 'Cancelled'),\n(5, 5, '2023-05-14', 290.75, 'Delivered'),\n(6, 6, '2023-05-15', 150.00, 'Pending'),\n(7, 7, '2023-05-16', 520.40, 'Delivered'),\n(8, 8, '2023-05-17', 610.30, 'Shipped'),\n(9, 9, '2023-05-18', 330.00, 'Delivered'),\n(10, 10, '2023-05-19', 470.60, 'Pending')",
+    "timestamp": "2025-10-25T17:15:04.024540",
+    "database": "mydb"
+  },
+  {
+    "name": "d",
+    "query": "CREATE TABLE Customers (\n    customer_id INTEGER PRIMARY KEY,\n    first_name VARCHAR(50),\n    last_name VARCHAR(50),\n    city VARCHAR(50),\n    email VARCHAR(100),\n    phone VARCHAR(15)\n); INSERT INTO Customers VALUES\n(1, 'Liam', 'Parker', 'New York', 'liam@example.com', '555-1111'),\n(2, 'Emma', 'Watson', 'Los Angeles', 'emma@example.com', '555-2222'),\n(3, 'Noah', 'Brown', 'Chicago', 'noah@example.com', '555-3333'),\n(4, 'Olivia', 'Davis', 'Seattle', 'olivia@example.com', '555-4444'),\n(5, 'Elijah', 'Miller', 'Boston', 'elijah@example.com', '555-5555'),\n(6, 'Sophia', 'Wilson', 'Austin', 'sophia@example.com', '555-6666'),\n(7, 'James', 'Anderson', 'Denver', 'james@example.com', '555-7777'),\n(8, 'Mia', 'Thomas', 'Miami', 'mia@example.com', '555-8888'),\n(9, 'Lucas', 'Garcia', 'Dallas', 'lucas@example.com', '555-9999'),\n(10, 'Amelia', 'Martinez', 'San Francisco', 'amelia@example.com', '555-1010')",
+    "timestamp": "2025-10-25T17:24:06.638520",
+    "database": "COmpnay db"
+  },
+  {
+    "name": "d",
+    "query": "CREATE TABLE Projects (\n    project_id INTEGER PRIMARY KEY,\n    project_name VARCHAR(100),\n    dept_id INTEGER,\n    start_date DATE,\n    end_date DATE,\n    budget DECIMAL(12,2),\n    FOREIGN KEY (dept_id) REFERENCES Departments(dept_id)\n); INSERT INTO Projects VALUES\n(1, 'Website Redesign', 3, '2023-01-15', '2023-06-30', 150000),\n(2, 'AI Research', 7, '2022-09-01', '2023-09-01', 300000),\n(3, 'ERP Implementation', 8, '2023-02-01', '2024-02-01', 250000),\n(4, 'Payroll System', 4, '2022-05-10', '2022-12-31', 100000),\n(5, 'App Development', 2, '2023-03-01', '2023-09-15', 180000),\n(6, 'Security Upgrade', 5, '2023-04-01', '2023-10-01', 120000),\n(7, 'Recruitment Drive', 1, '2022-11-01', '2023-01-31', 50000),\n(8, 'Marketing Campaign', 3, '2023-05-01', '2023-08-31', 70000),\n(9, 'Sales Expansion', 6, '2023-02-15', '2023-11-30', 95000),\n(10, 'Legal Compliance', 9, '2022-06-01', '2022-12-01', 40000)",
+    "timestamp": "2025-10-25T17:24:12.107277",
+    "database": "COmpnay db"
+  }
+]
