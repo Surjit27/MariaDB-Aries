@@ -2,31 +2,28 @@ import os
 import json
 import time
 from typing import Optional, Dict, Any, List
+from dotenv import load_dotenv
 import google.generativeai as genai
-
-# Add the project root to the Python path
-import sys
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.append(project_root)
-
 from ai.models import (
     AIRequest, AIResponse, SQLQueryResponse, DatabaseSchema, 
     QueryType, AIResponse
 )
 
-class GeminiIntegration:
+# Load environment variables
+load_dotenv()
+
+class EnhancedGeminiIntegration:
     """Enhanced Gemini AI integration with structured output using Pydantic models."""
     
     def __init__(self):
         """Initialize the Gemini integration."""
         self.api_key = os.getenv('GEMINI_API_KEY')
-        self.model_name = os.getenv('AI_MODEL', 'gemini-2.5-flash')
+        self.model_name = os.getenv('AI_MODEL', 'gemini-pro')
         self.max_tokens = int(os.getenv('AI_MAX_TOKENS', '1000'))
         self.temperature = float(os.getenv('AI_TEMPERATURE', '0.7'))
         
         if not self.api_key:
-            print("Warning: GEMINI_API_KEY not found in environment variables. AI features will be disabled.")
+            print("Warning: GEMINI_API_KEY not found in environment variables")
             self.model = None
             return
         
@@ -43,22 +40,19 @@ class GeminiIntegration:
         """Check if AI integration is available."""
         return self.model is not None
     
-    def generate_sql_query(self, user_prompt: str, database_schema: Dict[str, Any] = None, 
-                          context: Optional[str] = None) -> Optional[str]:
-        """Generate SQL query from natural language prompt."""
+    def generate_sql_query(self, user_prompt: str, database_schema: Dict[str, Any], 
+                          context: Optional[str] = None) -> AIResponse:
+        """Generate SQL query from natural language prompt with structured output."""
+        start_time = time.time()
+        
         if not self.is_available():
-            print("AI integration not available - check API key")
-            return None
+            return AIResponse(
+                success=False,
+                error_message="AI integration not available - check API key",
+                processing_time=time.time() - start_time
+            )
         
         try:
-            # If no schema provided, create a basic one
-            if not database_schema:
-                database_schema = {
-                    "database_name": "current_database",
-                    "tables": [],
-                    "relationships": []
-                }
-            
             # Create database schema object
             db_schema = DatabaseSchema(**database_schema)
             
@@ -81,70 +75,56 @@ class GeminiIntegration:
                 )
             )
             
-            # Parse the response and return just the SQL query
+            # Parse the response
             sql_response = self._parse_gemini_response(response.text)
-            return sql_response.query
+            
+            processing_time = time.time() - start_time
+            
+            return AIResponse(
+                success=True,
+                sql_response=sql_response,
+                processing_time=processing_time
+            )
             
         except Exception as e:
-            print(f"Error generating SQL query: {str(e)}")
-            return None
-
+            processing_time = time.time() - start_time
+            return AIResponse(
+                success=False,
+                error_message=f"Error generating SQL query: {str(e)}",
+                processing_time=processing_time
+            )
+    
     def _create_structured_prompt(self, request: AIRequest) -> str:
         """Create a structured prompt for Gemini with database schema and context."""
-        
-        # Handle both Pydantic model and dictionary schema
-        if hasattr(request.database_schema, 'database_name'):
-            # Pydantic model
-            db_name = request.database_schema.database_name
-            tables = request.database_schema.tables
-            relationships = request.database_schema.relationships
-        else:
-            # Dictionary schema
-            db_name = request.database_schema.get('database_name', 'Unknown')
-            tables = request.database_schema.get('tables', [])
-            relationships = request.database_schema.get('relationships', [])
         
         prompt = f"""
 You are an expert SQL query generator. Your task is to convert natural language prompts into accurate SQL queries.
 
 DATABASE SCHEMA:
-Database: {db_name}
+Database: {request.database_schema.database_name}
 
 Tables and Columns:
 """
         
         # Add table information
-        for table in tables:
-            if isinstance(table, dict):
-                table_name = table.get('table_name', 'unknown')
-                columns = table.get('columns', [])
-            else:
-                # Handle case where table is just a string name
-                table_name = str(table)
-                columns = []
-            
-            prompt += f"\nTable: {table_name}\n"
-            if columns:
-                prompt += "Columns:\n"
-                for column in columns:
-                    if isinstance(column, dict):
-                        col_info = f"  - {column.get('name', 'unknown')} ({column.get('type', 'TEXT')})"
-                        if column.get('primary_key'):
-                            col_info += " [PRIMARY KEY]"
-                        if column.get('nullable') == False:
-                            col_info += " [NOT NULL]"
-                        if column.get('unique'):
-                            col_info += " [UNIQUE]"
-                        prompt += col_info + "\n"
-            else:
-                prompt += "  (No column information available)\n"
+        for table in request.database_schema.tables:
+            prompt += f"\nTable: {table['table_name']}\n"
+            prompt += "Columns:\n"
+            for column in table['columns']:
+                col_info = f"  - {column['name']} ({column['type']})"
+                if column.get('primary_key'):
+                    col_info += " [PRIMARY KEY]"
+                if column.get('nullable') == False:
+                    col_info += " [NOT NULL]"
+                if column.get('unique'):
+                    col_info += " [UNIQUE]"
+                prompt += col_info + "\n"
         
         # Add relationships
-        if relationships:
+        if request.database_schema.relationships:
             prompt += "\nRelationships:\n"
-            for rel in relationships:
-                if isinstance(rel, dict):
-                    prompt += f"  - {rel.get('from_table', 'unknown')}.{rel.get('from_column', 'unknown')} -> {rel.get('to_table', 'unknown')}.{rel.get('to_column', 'unknown')}\n"
+            for rel in request.database_schema.relationships:
+                prompt += f"  - {rel['from_table']}.{rel['from_column']} -> {rel['to_table']}.{rel['to_column']}\n"
         
         # Add context if provided
         if request.context:
@@ -162,6 +142,20 @@ INSTRUCTIONS:
 5. Consider performance and use appropriate indexes
 6. Return ONLY the SQL query, no explanations
 
+RESPONSE FORMAT:
+Return your response in the following JSON format:
+{{
+    "query": "SELECT * FROM table_name WHERE condition",
+    "query_type": "SELECT",
+    "explanation": "Brief explanation of what this query does",
+    "tables_involved": ["table1", "table2"],
+    "columns_involved": ["column1", "column2"],
+    "complexity_level": "Simple|Medium|Complex",
+    "estimated_execution_time": "< 1ms",
+    "suggestions": ["suggestion1", "suggestion2"],
+    "confidence_score": 0.95
+}}
+
 SQL QUERY:
 """
         
@@ -171,6 +165,7 @@ SQL QUERY:
         """Parse Gemini response and return structured SQL query response."""
         try:
             # Try to extract JSON from the response
+            # Look for JSON between ```json and ``` or just raw JSON
             if "```json" in response_text:
                 json_start = response_text.find("```json") + 7
                 json_end = response_text.find("```", json_start)
@@ -263,3 +258,31 @@ Provide 3-5 completion suggestions. Return only the SQL keywords or phrases, one
         except Exception as e:
             print(f"Error getting suggestions: {e}")
             return []
+    
+    def optimize_query(self, sql_query: str, database_schema: Dict[str, Any]) -> str:
+        """Suggest optimizations for a SQL query."""
+        if not self.is_available():
+            return "AI integration not available"
+        
+        try:
+            prompt = f"""
+Analyze this SQL query and suggest optimizations:
+
+{sql_query}
+
+Database Schema: {json.dumps(database_schema, indent=2)}
+
+Provide specific optimization suggestions including:
+1. Index recommendations
+2. Query structure improvements
+3. Performance considerations
+4. Best practices
+
+Keep suggestions practical and actionable.
+"""
+            
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+            
+        except Exception as e:
+            return f"Error optimizing query: {str(e)}"

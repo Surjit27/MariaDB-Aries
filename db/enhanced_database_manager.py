@@ -221,6 +221,137 @@ class EnhancedDatabaseManager:
     def get_favorites(self) -> List[Dict]:
         """Get favorite queries."""
         return self.favorites
+<<<<<<< Updated upstream
+=======
+    
+    def create_database(self, db_name: str) -> bool:
+        """Create a new database file."""
+        try:
+            db_path = os.path.join(self.db_path, f"{db_name}.db")
+            
+            # Check if database already exists
+            if os.path.exists(db_path):
+                print(f"Database {db_name} already exists")
+                return False
+            
+            # Create the database file by connecting to it
+            temp_conn = sqlite3.connect(db_path)
+            temp_conn.close()
+            
+            print(f"Database {db_name} created successfully at {db_path}")
+            return True
+            
+        except Exception as e:
+            print(f"Error creating database {db_name}: {e}")
+            return False
+    
+    def switch_database(self, db_name: str) -> bool:
+        """Switch to a different database."""
+        try:
+            db_path = os.path.join(self.db_path, f"{db_name}.db")
+            
+            if not os.path.exists(db_path):
+                print(f"Database {db_name} does not exist")
+                return False
+            
+            # Close current connection if exists
+            if self.connection:
+                self.connection.close()
+            
+            # Connect to new database
+            self.connection = sqlite3.connect(db_path)
+            self.cursor = self.connection.cursor()
+            self.current_db = db_name
+            
+            print(f"Switched to database: {db_name}")
+            return True
+            
+        except Exception as e:
+            print(f"Error switching to database {db_name}: {e}")
+            return False
+    
+    def get_database_schema_for_ai(self) -> Dict[str, Any]:
+        if not self.connection or not self.cursor:
+            return {
+                "database_name": "No database",
+                "tables": [],
+                "relationships": []
+            }
+        
+        try:
+            # Get all tables
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            tables = [row[0] for row in self.cursor.fetchall()]
+            
+            schema = {
+                "database_name": self.current_db or "Unknown",
+                "tables": [],
+                "relationships": []
+            }
+            
+            # Get schema for each table
+            for table_name in tables:
+                table_info = {
+                    "table_name": table_name,
+                    "columns": []
+                }
+                
+                # Get column information
+                self.cursor.execute(f"PRAGMA table_info({table_name})")
+                columns = self.cursor.fetchall()
+                
+                for col in columns:
+                    col_info = {
+                        "name": col[1],
+                        "type": col[2],
+                        "nullable": not col[3],  # NOT NULL is 1, nullable is 0
+                        "primary_key": bool(col[5])  # Primary key is 1
+                    }
+                    table_info["columns"].append(col_info)
+                
+                # Get foreign key relationships
+                self.cursor.execute(f"PRAGMA foreign_key_list({table_name})")
+                foreign_keys = self.cursor.fetchall()
+                
+                for fk in foreign_keys:
+                    relationship = {
+                        "from_table": table_name,
+                        "from_column": fk[3],  # Column name
+                        "to_table": fk[2],     # Referenced table
+                        "to_column": fk[4]     # Referenced column
+                    }
+                    schema["relationships"].append(relationship)
+                
+                schema["tables"].append(table_info)
+            
+            return schema
+            
+        except Exception as e:
+            print(f"Error getting database schema: {e}")
+            return {
+                "database_name": self.current_db or "Unknown",
+                "tables": [],
+                "relationships": []
+            }
+    
+    def force_save_history(self):
+        """Force save query history to JSON file."""
+        try:
+            self.save_query_history()
+            print("Query history force saved successfully")
+        except Exception as e:
+            print(f"Error force saving query history: {e}")
+    
+    def get_history_count(self) -> int:
+        """Get the number of queries in history."""
+        return len(self.query_history)
+    
+    def clear_query_history(self):
+        """Clear all query history."""
+        self.query_history = []
+        self.save_query_history()
+        print("Query history cleared")
+>>>>>>> Stashed changes
 
     def load_database_schema(self):
         """Load and cache database schema information."""

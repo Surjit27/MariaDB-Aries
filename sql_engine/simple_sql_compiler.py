@@ -216,7 +216,85 @@ class SimpleSQLCompiler:
                 # Include other constraints
                 compiled_parts.append(part)
         
+<<<<<<< Updated upstream
         return ' '.join(compiled_parts)
+=======
+        if 'FOREIGN KEY' in constraint_upper:
+            return self._compile_foreign_key(constraint)
+        elif 'PRIMARY KEY' in constraint_upper:
+            return self._compile_primary_key(constraint)
+        elif 'UNIQUE' in constraint_upper:
+            return self._compile_unique_constraint(constraint)
+        elif 'CHECK' in constraint_upper:
+            return self._compile_check_constraint(constraint)
+        else:
+            return constraint
+    
+    def _compile_foreign_key(self, constraint: str) -> str:
+        """Compile foreign key constraint."""
+        # Extract foreign key definition
+        fk_match = re.search(r'FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+(\w+)\s*\(([^)]+)\)', constraint, re.IGNORECASE)
+        if fk_match:
+            local_cols = fk_match.group(1)
+            ref_table = fk_match.group(2)
+            ref_cols = fk_match.group(3)
+            return f"FOREIGN KEY ({local_cols}) REFERENCES {ref_table}({ref_cols})"
+        return constraint
+    
+    def _compile_primary_key(self, constraint: str) -> str:
+        """Compile primary key constraint."""
+        pk_match = re.search(r'PRIMARY\s+KEY\s*\(([^)]+)\)', constraint, re.IGNORECASE)
+        if pk_match:
+            columns = pk_match.group(1)
+            return f"PRIMARY KEY ({columns})"
+        return constraint
+    
+    def _compile_unique_constraint(self, constraint: str) -> str:
+        """Compile unique constraint."""
+        unique_match = re.search(r'UNIQUE\s*\(([^)]+)\)', constraint, re.IGNORECASE)
+        if unique_match:
+            columns = unique_match.group(1)
+            return f"UNIQUE ({columns})"
+        return constraint
+    
+    def _compile_check_constraint(self, constraint: str) -> str:
+        """Compile check constraint."""
+        check_match = re.search(r'CHECK\s*\(([^)]+)\)', constraint, re.IGNORECASE)
+        if check_match:
+            condition = check_match.group(1)
+            return f"CHECK ({condition})"
+        return constraint
+    
+    def _compile_create_index(self, sql: str) -> str:
+        """Compile CREATE INDEX statement."""
+        return self._apply_basic_transformations(sql)
+    
+    def _compile_create_view(self, sql: str) -> str:
+        """Compile CREATE VIEW statement."""
+        return self._apply_basic_transformations(sql)
+    
+    def _compile_create_trigger(self, sql: str) -> str:
+        """Compile CREATE TRIGGER statement."""
+        return self._apply_basic_transformations(sql)
+    
+    def _compile_create_function(self, sql: str) -> str:
+        """Compile CREATE FUNCTION statement."""
+        return self._apply_basic_transformations(sql)
+    
+    def _compile_create_procedure(self, sql: str) -> str:
+        """Compile CREATE PROCEDURE statement."""
+        return self._apply_basic_transformations(sql)
+    
+    def _compile_create_database(self, sql: str) -> str:
+        """Compile CREATE DATABASE statement."""
+        # Extract database name
+        import re
+        match = re.search(r'CREATE\s+DATABASE\s+(\w+)', sql, re.IGNORECASE)
+        if match:
+            db_name = match.group(1)
+            return f"-- CREATE DATABASE {db_name}\n-- In SQLite, databases are files. Use the application's database creation feature."
+        return "-- CREATE DATABASE not supported in SQLite"
+>>>>>>> Stashed changes
     
     def _compile_alter_table(self, sql: str) -> str:
         """Compile ALTER TABLE statement."""
@@ -242,7 +320,25 @@ class SimpleSQLCompiler:
     
     def _compile_use(self, sql: str) -> str:
         """Compile USE statement."""
+<<<<<<< Updated upstream
         # USE statements are handled by the database manager, not SQLite
+=======
+        # Extract database name
+        import re
+        match = re.search(r'USE\s+(\w+)', sql, re.IGNORECASE)
+        if match:
+            db_name = match.group(1)
+            return f"-- USE DATABASE {db_name}\n-- In SQLite, use the application's database switching feature."
+        return "-- USE DATABASE not supported in SQLite"
+    
+    def _compile_truncate(self, sql: str) -> str:
+        """Compile TRUNCATE statement."""
+        # SQLite doesn't have TRUNCATE, use DELETE instead
+        table_match = re.search(r'TRUNCATE\s+(?:TABLE\s+)?(\w+)', sql, re.IGNORECASE)
+        if table_match:
+            table_name = table_match.group(1)
+            return f"DELETE FROM {table_name}"
+>>>>>>> Stashed changes
         return sql
     
     def _compile_create_database(self, sql: str) -> str:

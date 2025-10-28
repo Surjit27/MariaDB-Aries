@@ -28,6 +28,9 @@ class DBMSWorkbench(ttk.Window):
         self.geometry("1200x800")
         self.minsize(768, 600)  # Minimum size for responsive design
         
+        # Set API key directly for AI integration
+        os.environ['GEMINI_API_KEY'] = 'AIzaSyCcY01MZsIFwm1li0IAf_pk5knwo6emVjo'
+        
         # Initialize Enhanced Database Manager
         db_storage_path = os.path.join(os.getcwd(), "databases")
         print(f"Database storage path: {db_storage_path}")

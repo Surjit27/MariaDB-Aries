@@ -18,8 +18,8 @@ class ResultsViewerPanel(ttk.Frame):
         label = ttk.Label(self, text="Query Results")
         label.pack(pady=5)
         
-        # Treeview for displaying query results
-        self.tree = ttk.Treeview(self)
+        # Treeview for displaying query results with increased size
+        self.tree = ttk.Treeview(self, height=20)  # Increased height
         self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Add scrollbar for treeview
@@ -67,6 +67,7 @@ class ResultsViewerPanel(ttk.Frame):
         for item in self.tree.get_children():
             self.tree.delete(item)
         
+<<<<<<< Updated upstream
         # Set columns
         self.tree['columns'] = columns
         self.tree.heading('#0', text='Row')
@@ -74,6 +75,21 @@ class ResultsViewerPanel(ttk.Frame):
             self.tree.heading(col, text=col)
             self.tree.column(col, width=100, anchor=tk.W)
         self.tree.column('#0', width=50, anchor=tk.W)
+=======
+        # Validate inputs
+        if not columns or not isinstance(columns, list):
+            columns = ['Result']
+        if not data or not isinstance(data, list):
+            data = []
+        
+        # Set columns with increased widths
+        self.tree['columns'] = columns
+        self.tree.heading('#0', text='Row')
+        for col in columns:
+            self.tree.heading(col, text=str(col))
+            self.tree.column(col, width=200, anchor=tk.W)  # Increased from 120 to 200
+        self.tree.column('#0', width=80, anchor=tk.W)  # Increased from 50 to 80
+>>>>>>> Stashed changes
         
         # Insert data
         for i, row in enumerate(data, 1):

@@ -569,6 +569,15 @@ class EnhancedSQLEditor:
             self.status_label.configure(text="No query to run")
             return
         
+        # Check for database creation/switching commands
+        query_upper = query.upper()
+        if query_upper.startswith('CREATE DATABASE'):
+            self._handle_create_database(query)
+            return
+        elif query_upper.startswith('USE '):
+            self._handle_use_database(query)
+            return
+        
         self.status_label.configure(text="Compiling and running query...")
         
         try:
@@ -713,9 +722,44 @@ class EnhancedSQLEditor:
         self.status_label.configure(text="Compiled SQL copied to editor")
     
     def generate_sql(self):
-        """Generate SQL using AI."""
-        # This would typically open the AI assistant
-        self.status_label.configure(text="AI generation requested")
+        """Generate SQL using AI with database schema context."""
+        if not self.ai_integration or not self.ai_integration.is_available():
+            self.status_label.configure(text="AI integration not available")
+            return
+        
+        # Get user prompt
+        from tkinter import simpledialog
+        user_prompt = simpledialog.askstring("AI SQL Generator", 
+                                           "Describe what you want to do with the database:")
+        
+        if not user_prompt:
+            return
+        
+        self.status_label.configure(text="Generating SQL with AI...")
+        
+        try:
+            # Get database schema for AI context
+            database_schema = {}
+            if hasattr(self.db_manager, 'get_database_schema_for_ai'):
+                database_schema = self.db_manager.get_database_schema_for_ai()
+            
+            # Generate SQL query using AI
+            generated_sql = self.ai_integration.generate_sql_query(
+                user_prompt=user_prompt,
+                database_schema=database_schema,
+                context=f"Current database: {self.db_manager.current_db or 'None'}"
+            )
+            
+            if generated_sql:
+                # Replace current editor content with generated SQL
+                self.editor.delete("1.0", tk.END)
+                self.editor.insert("1.0", generated_sql)
+                self.status_label.configure(text="SQL generated successfully by AI")
+            else:
+                self.status_label.configure(text="Failed to generate SQL")
+                
+        except Exception as e:
+            self.status_label.configure(text=f"AI Error: {str(e)}")
     
     def explain_sql(self):
         """Explain the current SQL query."""
@@ -768,3 +812,45 @@ class EnhancedSQLEditor:
     def set_sidebar(self, sidebar):
         """Set reference to sidebar."""
         self.sidebar = sidebar
+    
+    def _handle_create_database(self, query: str):
+        """Handle CREATE DATABASE command."""
+        import re
+        match = re.search(r'CREATE\s+DATABASE\s+(\w+)', query, re.IGNORECASE)
+        if match:
+            db_name = match.group(1)
+            if hasattr(self.db_manager, 'create_database'):
+                success = self.db_manager.create_database(db_name)
+                if success:
+                    self.status_label.configure(text=f"Database '{db_name}' created successfully")
+                    if hasattr(self, 'results_viewer') and self.results_viewer:
+                        self.results_viewer.display_results(['Message'], [[f"Database '{db_name}' created successfully"]])
+                else:
+                    self.status_label.configure(text=f"Failed to create database '{db_name}'")
+                    if hasattr(self, 'results_viewer') and self.results_viewer:
+                        self.results_viewer.display_error(f"Failed to create database '{db_name}'")
+            else:
+                self.status_label.configure(text="Database creation not supported")
+        else:
+            self.status_label.configure(text="Invalid CREATE DATABASE syntax")
+    
+    def _handle_use_database(self, query: str):
+        """Handle USE DATABASE command."""
+        import re
+        match = re.search(r'USE\s+(\w+)', query, re.IGNORECASE)
+        if match:
+            db_name = match.group(1)
+            if hasattr(self.db_manager, 'switch_database'):
+                success = self.db_manager.switch_database(db_name)
+                if success:
+                    self.status_label.configure(text=f"Switched to database '{db_name}'")
+                    if hasattr(self, 'results_viewer') and self.results_viewer:
+                        self.results_viewer.display_results(['Message'], [[f"Switched to database '{db_name}'"]])
+                else:
+                    self.status_label.configure(text=f"Failed to switch to database '{db_name}'")
+                    if hasattr(self, 'results_viewer') and self.results_viewer:
+                        self.results_viewer.display_error(f"Failed to switch to database '{db_name}'")
+            else:
+                self.status_label.configure(text="Database switching not supported")
+        else:
+            self.status_label.configure(text="Invalid USE DATABASE syntax")

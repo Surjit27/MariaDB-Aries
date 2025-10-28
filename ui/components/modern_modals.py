@@ -110,7 +110,7 @@ class ModernModals:
             db_name = name_entry.get()
             if db_name:
                 preview_content = f"""-- Database: {db_name}
--- Created: {tk.datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+-- Created: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 -- Sample tables will be created: {'Yes' if create_sample_var.get() else 'No'}
 -- AI suggestions: {'Enabled' if enable_ai_var.get() else 'Disabled'}
