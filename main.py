@@ -243,6 +243,13 @@ class DBMSWorkbench(ttk.Window):
         # Separator
         ttk.Separator(button_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
         
+        # History management
+        self.create_button_with_label(button_frame, "💾", "Save", self.save_query_history, "Save Query History")
+        self.create_button_with_label(button_frame, "📊", "Stats", self.show_query_stats, "Show Query Statistics")
+        
+        # Separator
+        ttk.Separator(button_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        
         # Settings
         self.create_button_with_label(button_frame, "🌙", "Theme", self.toggle_theme, "Toggle Theme")
         self.create_button_with_label(button_frame, "⚙️", "Settings", self.show_settings, "Settings")
@@ -273,6 +280,47 @@ class DBMSWorkbench(ttk.Window):
         create_improved_tooltip(label, tooltip_text)
         
         return button
+    
+    def save_query_history(self):
+        """Manually save query history."""
+        if hasattr(self.db_manager, 'force_save_history'):
+            self.db_manager.force_save_history()
+            from tkinter import messagebox
+            messagebox.showinfo("Success", "Query history saved successfully!")
+        else:
+            from tkinter import messagebox
+            messagebox.showerror("Error", "Unable to save query history")
+    
+    def show_query_stats(self):
+        """Show query statistics."""
+        if hasattr(self.db_manager, 'get_history_count'):
+            total_queries = self.db_manager.get_history_count()
+            history = self.db_manager.get_query_history()
+            
+            # Count by status
+            success_count = sum(1 for item in history if item.get('status') == 'success')
+            error_count = sum(1 for item in history if 'error' in item.get('status', ''))
+            
+            stats_text = f"""Query Statistics
+            
+Total Queries: {total_queries}
+Successful: {success_count}
+Failed: {error_count}
+Success Rate: {(success_count/total_queries*100):.1f}% if total_queries > 0 else 0
+
+Recent Queries:
+"""
+            # Show last 5 queries
+            for i, item in enumerate(history[-5:], 1):
+                query_preview = item['query'][:50] + "..." if len(item['query']) > 50 else item['query']
+                status = item.get('status', 'Unknown')
+                stats_text += f"{i}. {query_preview} ({status})\n"
+            
+            from tkinter import messagebox
+            messagebox.showinfo("Query Statistics", stats_text)
+        else:
+            from tkinter import messagebox
+            messagebox.showerror("Error", "Unable to get query statistics")
     
     # Modern modal methods
     def show_create_database_modal(self):

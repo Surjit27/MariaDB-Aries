@@ -588,12 +588,17 @@ class EnhancedSQLEditor:
             validation_result = self.sql_compiler.validate_sql(compiled_query)
             
             if not validation_result['valid']:
-                self.status_label.configure(text=f"SQL Error: {', '.join(validation_result['errors'])}")
+                error_msg = f"SQL Error: {', '.join(validation_result['errors'])}"
+                self.status_label.configure(text=error_msg)
+                # Show error in results viewer if available
+                if hasattr(self, 'results_viewer') and self.results_viewer:
+                    self.results_viewer.display_error(error_msg)
                 return
             
             # Show warnings if any
             if validation_result['warnings']:
-                self.status_label.configure(text=f"Warnings: {', '.join(validation_result['warnings'])}")
+                warning_msg = f"Warnings: {', '.join(validation_result['warnings'])}"
+                self.status_label.configure(text=warning_msg)
             
             # Execute the compiled query through the database manager
             if self.db_manager and self.db_manager.current_db:
@@ -603,21 +608,66 @@ class EnhancedSQLEditor:
                     
                     # Display results in the results viewer
                     if hasattr(self, 'results_viewer') and self.results_viewer:
-                        self.results_viewer.display_results(result)
+                        if isinstance(result, tuple) and len(result) == 3:
+                            # Result is (columns, data, error) from database manager
+                            columns, data, error = result
+                            if error:
+                                # If there's an error, show it
+                                self.results_viewer.display_error(error)
+                            elif columns and data is not None:
+                                # Display the actual table data
+                                self.results_viewer.display_results(columns, data)
+                            else:
+                                # No data returned (e.g., INSERT, UPDATE, DELETE)
+                                self.results_viewer.display_results(['Message'], [['Query executed successfully']])
+                        elif isinstance(result, tuple) and len(result) == 2:
+                            # Result is (columns, data) - legacy format
+                            columns, data = result
+                            self.results_viewer.display_results(columns, data)
+                        else:
+                            # Result is just data or different format
+                            self.results_viewer.display_results(['Result'], [[str(result)]])
                     
                     self.status_label.configure(text="Query executed successfully")
                     
                     # Add to query history
                     if hasattr(self.db_manager, 'add_to_history'):
-                        self.db_manager.add_to_history(query)
+                        self.db_manager.add_to_history(query, "success")
+                        # Force save to ensure it's persisted
+                        if hasattr(self.db_manager, 'force_save_history'):
+                            self.db_manager.force_save_history()
                         
                 except Exception as e:
-                    self.status_label.configure(text=f"Database Error: {str(e)}")
+                    error_msg = f"Database Error: {str(e)}"
+                    self.status_label.configure(text=error_msg)
+                    # Show error in results viewer if available
+                    if hasattr(self, 'results_viewer') and self.results_viewer:
+                        self.results_viewer.display_error(error_msg)
+                    # Add failed query to history
+                    if hasattr(self.db_manager, 'add_to_history'):
+                        self.db_manager.add_to_history(query, f"error: {str(e)}")
+                        # Force save to ensure it's persisted
+                        if hasattr(self.db_manager, 'force_save_history'):
+                            self.db_manager.force_save_history()
             else:
-                self.status_label.configure(text="No database selected")
+                error_msg = "No database selected"
+                self.status_label.configure(text=error_msg)
+                # Show error in results viewer if available
+                if hasattr(self, 'results_viewer') and self.results_viewer:
+                    self.results_viewer.display_error(error_msg)
                 
         except Exception as e:
-            self.status_label.configure(text=f"Compilation Error: {str(e)}")
+            error_msg = f"Compilation Error: {str(e)}"
+            self.status_label.configure(text=error_msg)
+            # Show error in results viewer if available
+            if hasattr(self, 'results_viewer') and self.results_viewer:
+                self.results_viewer.display_error(error_msg)
+            # Add failed query to history
+            if hasattr(self.db_manager, 'add_to_history'):
+                self.db_manager.add_to_history(query, f"compilation error: {str(e)}")
+                # Force save to ensure it's persisted
+                if hasattr(self.db_manager, 'force_save_history'):
+                    self.db_manager.force_save_history()
     
     def clear_editor(self):
         """Clear the editor."""
@@ -640,28 +690,48 @@ class EnhancedSQLEditor:
             
             if not validation_result['valid']:
                 self.status_label.configure(text=f"Compilation Error: {', '.join(validation_result['errors'])}")
+                # Show error in results viewer if available
+                if hasattr(self, 'results_viewer') and self.results_viewer:
+                    self.results_viewer.display_error(f"Compilation Error: {', '.join(validation_result['errors'])}")
                 return
             
             # Show the compiled SQL in a new window
             self.show_compiled_sql(compiled_query, validation_result)
             
+            # Also show compilation success in status
+            self.status_label.configure(text="SQL compiled successfully")
+            
         except Exception as e:
-            self.status_label.configure(text=f"Compilation Error: {str(e)}")
+            error_msg = f"Compilation Error: {str(e)}"
+            self.status_label.configure(text=error_msg)
+            # Show error in results viewer if available
+            if hasattr(self, 'results_viewer') and self.results_viewer:
+                self.results_viewer.display_error(error_msg)
     
     def show_compiled_sql(self, compiled_sql, validation_result):
         """Show the compiled SQL in a popup window."""
         # Create popup window
         popup = tk.Toplevel(self.editor)
-        popup.title("Compiled SQL")
-        popup.geometry("800x600")
+        popup.title("SQL Compiler Output")
+        popup.geometry("900x700")
         popup.configure(bg="#1e1e1e")
+        
+        # Make popup modal
+        popup.transient(self.editor)
+        popup.grab_set()
+        
+        # Center the popup
+        popup.update_idletasks()
+        x = (popup.winfo_screenwidth() // 2) - (popup.winfo_width() // 2)
+        y = (popup.winfo_screenheight() // 2) - (popup.winfo_height() // 2)
+        popup.geometry(f"+{x}+{y}")
         
         # Header frame
         header_frame = tk.Frame(popup, bg="#1e1e1e")
         header_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        title_label = tk.Label(header_frame, text="🔧 Compiled SQL Query", 
-                              font=("Arial", 14, "bold"), fg="#ffffff", bg="#1e1e1e")
+        title_label = tk.Label(header_frame, text="🔧 SQL Compiler Output", 
+                              font=("Arial", 16, "bold"), fg="#ffffff", bg="#1e1e1e")
         title_label.pack(side=tk.LEFT)
         
         # Status label
@@ -673,15 +743,23 @@ class EnhancedSQLEditor:
             status_color = "#00ff00"
         
         status_label = tk.Label(header_frame, text=status_text, 
-                              font=("Arial", 10), fg=status_color, bg="#1e1e1e")
+                              font=("Arial", 12), fg=status_color, bg="#1e1e1e")
         status_label.pack(side=tk.RIGHT)
         
+        # Create notebook for different views
+        notebook = ttk.Notebook(popup)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # Compiled SQL tab
+        compiled_frame = ttk.Frame(notebook)
+        notebook.add(compiled_frame, text="Compiled SQL")
+        
         # Text area for compiled SQL
-        text_frame = tk.Frame(popup, bg="#1e1e1e")
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        text_frame = tk.Frame(compiled_frame, bg="#1e1e1e")
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         text_widget = tk.Text(text_frame, 
-                             font=("Consolas", 11),
+                             font=("Consolas", 12),
                              bg="#2d2d2d", fg="#ffffff",
                              selectbackground="#404040", selectforeground="#ffffff",
                              relief="flat", bd=1, wrap=tk.WORD)
@@ -696,6 +774,33 @@ class EnhancedSQLEditor:
         text_widget.insert("1.0", compiled_sql)
         text_widget.configure(state=tk.DISABLED)
         
+        # Validation details tab
+        validation_frame = ttk.Frame(notebook)
+        notebook.add(validation_frame, text="Validation Details")
+        
+        validation_text = tk.Text(validation_frame, 
+                                font=("Consolas", 11),
+                                bg="#2d2d2d", fg="#ffffff",
+                                selectbackground="#404040", selectforeground="#ffffff",
+                                relief="flat", bd=1, wrap=tk.WORD)
+        validation_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Add validation details
+        validation_details = f"Validation Status: {'Valid' if validation_result['valid'] else 'Invalid'}\n\n"
+        if validation_result['errors']:
+            validation_details += f"Errors:\n"
+            for error in validation_result['errors']:
+                validation_details += f"  ❌ {error}\n"
+        if validation_result['warnings']:
+            validation_details += f"\nWarnings:\n"
+            for warning in validation_result['warnings']:
+                validation_details += f"  ⚠️ {warning}\n"
+        if not validation_result['errors'] and not validation_result['warnings']:
+            validation_details += "No errors or warnings found.\n"
+        
+        validation_text.insert("1.0", validation_details)
+        validation_text.configure(state=tk.DISABLED)
+        
         # Button frame
         button_frame = tk.Frame(popup, bg="#1e1e1e")
         button_frame.pack(fill=tk.X, padx=10, pady=5)
@@ -706,6 +811,13 @@ class EnhancedSQLEditor:
                             bg="#007acc", fg="#ffffff", bd=0, font=("Arial", 10),
                             activebackground="#005a9e", activeforeground="#ffffff")
         copy_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Run compiled SQL button
+        run_btn = tk.Button(button_frame, text="▶️ Run Compiled SQL", 
+                           command=lambda: self.run_compiled_sql(compiled_sql, popup),
+                           bg="#28a745", fg="#ffffff", bd=0, font=("Arial", 10),
+                           activebackground="#218838", activeforeground="#ffffff")
+        run_btn.pack(side=tk.LEFT, padx=5)
         
         # Close button
         close_btn = tk.Button(button_frame, text="❌ Close", 
@@ -720,6 +832,17 @@ class EnhancedSQLEditor:
         self.editor.insert("1.0", compiled_sql)
         popup.destroy()
         self.status_label.configure(text="Compiled SQL copied to editor")
+    
+    def run_compiled_sql(self, compiled_sql, popup):
+        """Run the compiled SQL directly."""
+        popup.destroy()
+        
+        # Replace current editor content with compiled SQL
+        self.editor.delete("1.0", tk.END)
+        self.editor.insert("1.0", compiled_sql)
+        
+        # Run the query
+        self.run_query()
     
     def generate_sql(self):
         """Generate SQL using AI with database schema context."""

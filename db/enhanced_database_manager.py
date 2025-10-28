@@ -193,16 +193,35 @@ class EnhancedDatabaseManager:
 
     def add_to_history(self, query: str, status: str):
         """Add query to history."""
-        self.query_history.append({
-            "query": query,
-            "timestamp": datetime.now().isoformat(),
-            "status": status,
-            "database": self.current_db
-        })
-        # Keep only last 100 queries
-        if len(self.query_history) > 100:
-            self.query_history = self.query_history[-100:]
-        self.save_query_history()
+        try:
+            # Clean the query
+            query = query.strip()
+            if not query:
+                return
+            
+            # Create history entry
+            history_entry = {
+                "query": query,
+                "timestamp": datetime.now().isoformat(),
+                "status": status,
+                "database": self.current_db or "None",
+                "id": len(self.query_history) + 1  # Add unique ID
+            }
+            
+            # Add to history
+            self.query_history.append(history_entry)
+            
+            # Keep only last 100 queries
+            if len(self.query_history) > 100:
+                self.query_history = self.query_history[-100:]
+            
+            # Save to JSON file
+            self.save_query_history()
+            
+            print(f"Query added to history: {query[:50]}... (Status: {status})")
+            
+        except Exception as e:
+            print(f"Error adding query to history: {e}")
 
     def add_to_favorites(self, query: str, name: str):
         """Add query to favorites."""
@@ -221,8 +240,6 @@ class EnhancedDatabaseManager:
     def get_favorites(self) -> List[Dict]:
         """Get favorite queries."""
         return self.favorites
-<<<<<<< Updated upstream
-=======
     
     def create_database(self, db_name: str) -> bool:
         """Create a new database file."""
@@ -351,7 +368,24 @@ class EnhancedDatabaseManager:
         self.query_history = []
         self.save_query_history()
         print("Query history cleared")
->>>>>>> Stashed changes
+    
+    def force_save_history(self):
+        """Force save query history to JSON file."""
+        try:
+            self.save_query_history()
+            print("Query history force saved successfully")
+        except Exception as e:
+            print(f"Error force saving query history: {e}")
+    
+    def get_history_count(self) -> int:
+        """Get the number of queries in history."""
+        return len(self.query_history)
+    
+    def clear_query_history(self):
+        """Clear all query history."""
+        self.query_history = []
+        self.save_query_history()
+        print("Query history cleared")
 
     def load_database_schema(self):
         """Load and cache database schema information."""
@@ -542,42 +576,109 @@ class EnhancedDatabaseManager:
         return False
 
     def save_query_history(self):
-        """Save query history to file."""
+        """Save query history to JSON file."""
         try:
             history_file = os.path.join(self.db_path, "query_history.json")
-            with open(history_file, 'w') as f:
-                json.dump(self.query_history, f, indent=2)
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(history_file), exist_ok=True)
+            
+            # Create backup of existing file
+            if os.path.exists(history_file):
+                backup_file = history_file + ".backup"
+                import shutil
+                shutil.copy2(history_file, backup_file)
+            
+            # Save to JSON with proper formatting
+            with open(history_file, 'w', encoding='utf-8') as f:
+                json.dump(self.query_history, f, indent=2, ensure_ascii=False)
+            
+            print(f"Query history saved to: {history_file} ({len(self.query_history)} entries)")
+            
         except Exception as e:
             print(f"Error saving query history: {e}")
+            # Try to restore from backup if save failed
+            try:
+                backup_file = history_file + ".backup"
+                if os.path.exists(backup_file):
+                    import shutil
+                    shutil.copy2(backup_file, history_file)
+                    print("Restored from backup file")
+            except:
+                pass
 
     def load_query_history(self):
-        """Load query history from file."""
+        """Load query history from JSON file."""
         try:
             history_file = os.path.join(self.db_path, "query_history.json")
+            
             if os.path.exists(history_file):
-                with open(history_file, 'r') as f:
-                    self.query_history = json.load(f)
+                with open(history_file, 'r', encoding='utf-8') as f:
+                    loaded_history = json.load(f)
+                    
+                # Validate loaded data
+                if isinstance(loaded_history, list):
+                    self.query_history = loaded_history
+                    print(f"Query history loaded: {len(self.query_history)} entries")
+                else:
+                    print("Invalid query history format, starting fresh")
+                    self.query_history = []
+            else:
+                print("No query history file found, starting fresh")
+                self.query_history = []
+                
         except Exception as e:
             print(f"Error loading query history: {e}")
+            print("Starting with empty query history")
+            self.query_history = []
 
     def save_favorites(self):
-        """Save favorites to file."""
+        """Save favorites to JSON file."""
         try:
             favorites_file = os.path.join(self.db_path, "favorites.json")
-            with open(favorites_file, 'w') as f:
-                json.dump(self.favorites, f, indent=2)
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(favorites_file), exist_ok=True)
+            
+            # Create backup of existing file
+            if os.path.exists(favorites_file):
+                backup_file = favorites_file + ".backup"
+                import shutil
+                shutil.copy2(favorites_file, backup_file)
+            
+            # Save to JSON with proper formatting
+            with open(favorites_file, 'w', encoding='utf-8') as f:
+                json.dump(self.favorites, f, indent=2, ensure_ascii=False)
+            
+            print(f"Favorites saved to: {favorites_file} ({len(self.favorites)} entries)")
+            
         except Exception as e:
             print(f"Error saving favorites: {e}")
 
     def load_favorites(self):
-        """Load favorites from file."""
+        """Load favorites from JSON file."""
         try:
             favorites_file = os.path.join(self.db_path, "favorites.json")
+            
             if os.path.exists(favorites_file):
-                with open(favorites_file, 'r') as f:
-                    self.favorites = json.load(f)
+                with open(favorites_file, 'r', encoding='utf-8') as f:
+                    loaded_favorites = json.load(f)
+                    
+                # Validate loaded data
+                if isinstance(loaded_favorites, list):
+                    self.favorites = loaded_favorites
+                    print(f"Favorites loaded: {len(self.favorites)} entries")
+                else:
+                    print("Invalid favorites format, starting fresh")
+                    self.favorites = []
+            else:
+                print("No favorites file found, starting fresh")
+                self.favorites = []
+                
         except Exception as e:
             print(f"Error loading favorites: {e}")
+            print("Starting with empty favorites")
+            self.favorites = []
 
     def save_schemas(self):
         """Save schemas to file."""
