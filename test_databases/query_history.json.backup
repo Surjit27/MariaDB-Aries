@@ -53,12 +53,5 @@
     "status": "success",
     "database": "test_table_display",
     "id": 8
-  },
-  {
-    "query": "SELECT * FROM assets",
-    "timestamp": "2025-10-29T00:28:36.251218",
-    "status": "success",
-    "database": "test_table_display",
-    "id": 9
   }
 ]

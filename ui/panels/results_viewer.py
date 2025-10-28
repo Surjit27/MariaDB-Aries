@@ -3,7 +3,7 @@ import ttkbootstrap as ttk
 import csv
 import os
 from io import StringIO
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 
 class ResultsViewerPanel(ttk.Frame):
     def __init__(self, parent):
@@ -67,21 +67,52 @@ class ResultsViewerPanel(ttk.Frame):
         for item in self.tree.get_children():
             self.tree.delete(item)
         
+        # Validate inputs
+        if not columns or not isinstance(columns, list):
+            columns = ['Result']
+        if not data or not isinstance(data, list):
+            data = []
+        
         # Set columns
         self.tree['columns'] = columns
         self.tree.heading('#0', text='Row')
         for col in columns:
-            self.tree.heading(col, text=col)
-            self.tree.column(col, width=100, anchor=tk.W)
+            self.tree.heading(col, text=str(col))
+            self.tree.column(col, width=120, anchor=tk.W)
         self.tree.column('#0', width=50, anchor=tk.W)
         
         # Insert data
         for i, row in enumerate(data, 1):
-            self.tree.insert('', tk.END, text=str(i), values=row)
+            # Convert row to list if it's a tuple
+            if isinstance(row, tuple):
+                row_values = list(row)
+            elif isinstance(row, list):
+                row_values = row
+            else:
+                row_values = [str(row)]
+            
+            # Ensure we have the right number of values
+            while len(row_values) < len(columns):
+                row_values.append('')
+            
+            # Truncate if too many values
+            if len(row_values) > len(columns):
+                row_values = row_values[:len(columns)]
+            
+            self.tree.insert('', tk.END, text=str(i), values=row_values)
         
         # Store for sorting and export
         self.current_columns = ['Row'] + columns
-        self.current_data = [[str(i)] + list(row) for i, row in enumerate(data, 1)]
+        self.current_data = []
+        for i, row in enumerate(data, 1):
+            if isinstance(row, tuple):
+                row_values = [str(i)] + list(row)
+            elif isinstance(row, list):
+                row_values = [str(i)] + row
+            else:
+                row_values = [str(i), str(row)]
+            self.current_data.append(row_values)
+        
         self.sort_column = None
         self.sort_reverse = False
 
