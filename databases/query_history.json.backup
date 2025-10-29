@@ -96,5 +96,166 @@
     "status": "success",
     "database": "ascds",
     "id": 14
+  },
+  {
+    "query": "INSERT INTO departments (department_id, department_name, location) VALUES ('D001', 'Human Resources', 'New York')",
+    "timestamp": "2025-10-30T01:32:08.333033",
+    "status": "success",
+    "database": "company_db;",
+    "id": 15
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nINSERT INTO departments (department_id, department_name, location) VALUES\n ('D001', 'Human Resources', 'New York');",
+    "timestamp": "2025-10-30T01:32:08.358218",
+    "status": "success",
+    "database": "company_db;",
+    "id": 16
+  },
+  {
+    "query": "INSERT INTO employees (employee_id, first_name, last_name, email, phone, hire_date, salary, department_id) VALUES ('E004', 'Alice', 'Smith', 'alice.s@company.com', '555-1111', '2023-01-15', '75000', 'D004'), ('E005', 'Bob', 'Johnson', 'bob.j@company.com', '555-2222', '2022-06-01', '80000', 'D004'), ('E006', 'Charlie', 'Brown', 'charlie.b@company.com', '555-3333', '2024-03-10', '90000', 'D005')",
+    "timestamp": "2025-10-30T01:35:53.203480",
+    "status": "error: foreign key mismatch - \"Sawwdddlaries\" referencing \"Employees\"",
+    "database": "company_db;",
+    "id": 17
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nINSERT INTO employees (employee_id, first_name, last_name, email,\n phone, hire_date, salary, department_id)\n VALUES ('E004', 'Alice', 'Smith', 'alice.s@company.com', '555-1111',\n '2023-01-15', '75000', 'D004'),\n ('E005', 'Bob', 'Johnson', 'bob.j@company.com', '555-2222',\n '2022-06-01', '80000', 'D004'), ('E006', 'Charlie',\n 'Brown', 'charlie.b@company.com', '555-3333', '2024-03-10',\n '90000', 'D005');",
+    "timestamp": "2025-10-30T01:35:53.211600",
+    "status": "success",
+    "database": "company_db;",
+    "id": 18
+  },
+  {
+    "query": "CREATE TABLE Sawwdddlaries (\nemp_id TEXT NOT NULL,\nmonth TEXT,\nyear TEXT,\namount TEXT,\nsalary_id TEXT PRIMARY KEY,\nFOREIGN KEY (emp_id) REFERENCES employees(employee_id)\n)",
+    "timestamp": "2025-10-30T01:36:57.336681",
+    "status": "error: table Sawwdddlaries already exists",
+    "database": "company_db;",
+    "id": 19
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nCREATE TABLE Sawwdddlaries ( salary_id TEXT PRIMARY KEY, emp_id TEXT NOT NULL, month TEXT, year TEXT, amount TEXT, FOREIGN KEY (emp_id) REFERENCES employees(employee_id) ); ```",
+    "timestamp": "2025-10-30T01:36:57.344718",
+    "status": "success",
+    "database": "company_db;",
+    "id": 20
+  },
+  {
+    "query": "SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:37:29.334710",
+    "status": "success",
+    "database": "company_db;",
+    "id": 21
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:37:29.334710",
+    "status": "success",
+    "database": "company_db;",
+    "id": 22
+  },
+  {
+    "query": "SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ``` SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:09.983097",
+    "status": "success",
+    "database": "company_db;",
+    "id": 23
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```\n\n\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:09.983097",
+    "status": "success",
+    "database": "company_db;",
+    "id": 24
+  },
+  {
+    "query": "SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ``` SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:11.163623",
+    "status": "success",
+    "database": "company_db;",
+    "id": 25
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```\n\n\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:11.172084",
+    "status": "success",
+    "database": "company_db;",
+    "id": 26
+  },
+  {
+    "query": "SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ``` SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:11.807155",
+    "status": "success",
+    "database": "company_db;",
+    "id": 27
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```\n\n\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:11.818070",
+    "status": "success",
+    "database": "company_db;",
+    "id": 28
+  },
+  {
+    "query": "SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ``` SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:12.217404",
+    "status": "success",
+    "database": "company_db;",
+    "id": 29
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```\n\n\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:12.225678",
+    "status": "success",
+    "database": "company_db;",
+    "id": 30
+  },
+  {
+    "query": "SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ``` SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:12.398914",
+    "status": "success",
+    "database": "company_db;",
+    "id": 31
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```\n\n\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:12.398914",
+    "status": "success",
+    "database": "company_db;",
+    "id": 32
+  },
+  {
+    "query": "SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ``` SELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:12.597176",
+    "status": "success",
+    "database": "company_db;",
+    "id": 33
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```\n\n\n\nSELECT s.emp_id FROM Sawwdddlaries AS s LEFT JOIN Employees AS e ON s.emp_id = e.employee_id WHERE e.employee_id IS NULL; ```",
+    "timestamp": "2025-10-30T01:38:12.597176",
+    "status": "success",
+    "database": "company_db;",
+    "id": 34
+  },
+  {
+    "query": "INSERT INTO departments (department_id, department_name, location) VALUES ('D001', 'Human Resources', 'New York'); ```",
+    "timestamp": "2025-10-30T01:40:48.451184",
+    "status": "success",
+    "database": "company_db;",
+    "id": 35
+  },
+  {
+    "query": "-- Current Database: company_db;\n-- Ready to execute SQL queries\n\nINSERT INTO departments (department_id, department_name, location) VALUES ('D001', 'Human Resources', 'New York'); ```",
+    "timestamp": "2025-10-30T01:40:48.455706",
+    "status": "success",
+    "database": "company_db;",
+    "id": 36
+  },
+  {
+    "query": "SELECT 1",
+    "timestamp": "2025-10-30T01:47:35.980176",
+    "status": "success",
+    "database": "company_db;",
+    "id": 37
   }
 ]

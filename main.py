@@ -385,6 +385,7 @@ Recent Queries:
         self.bind("<Control-r>", lambda event: self.sql_editor.run_query())
         self.bind("<Control-c>", lambda event: self.sql_editor.clear_editor())
         self.bind("<Control-g>", lambda event: self.sql_editor.generate_sql())
+        self.bind("<Control-Shift-a>", lambda event: self.sql_editor.show_horizontal_ai_modal())
         
         # Tab switching shortcuts
         self.bind("<Control-1>", lambda event: self.main_notebook.select(0))  # SQL Editor

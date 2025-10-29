@@ -159,5 +159,229 @@
         }
       ]
     }
-  }
+  },
+  "company_db;": {
+    "departments": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "department_id",
+          "type": "INT AUTO_INCREMENT",
+          "notnull": false,
+          "default": null,
+          "pk": true
+        },
+        {
+          "cid": 1,
+          "name": "department_name",
+          "type": "VARCHAR(100)",
+          "notnull": true,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 2,
+          "name": "location",
+          "type": "VARCHAR(100)",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        }
+      ],
+      "foreign_keys": []
+    },
+    "employees": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "employee_id",
+          "type": "INT AUTO_INCREMENT",
+          "notnull": false,
+          "default": null,
+          "pk": true
+        },
+        {
+          "cid": 1,
+          "name": "first_name",
+          "type": "VARCHAR(50)",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 2,
+          "name": "last_name",
+          "type": "VARCHAR(50)",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 3,
+          "name": "email",
+          "type": "VARCHAR(100)",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 4,
+          "name": "phone",
+          "type": "VARCHAR(20)",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 5,
+          "name": "hire_date",
+          "type": "DATE",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 6,
+          "name": "salary",
+          "type": "DECIMAL(10,2)",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 7,
+          "name": "department_id",
+          "type": "INT",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "departments",
+          "from": "department_id",
+          "to": "department_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ]
+    },
+    "Sawwlaries": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "salary_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": true
+        },
+        {
+          "cid": 1,
+          "name": "emp_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 2,
+          "name": "month",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 3,
+          "name": "year",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 4,
+          "name": "amount",
+          "type": "REAL",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "Employees",
+          "from": "emp_id",
+          "to": "emp_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ]
+    },
+    "Sawwdddlaries": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "salary_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": true
+        },
+        {
+          "cid": 1,
+          "name": "emp_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 2,
+          "name": "month",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 3,
+          "name": "year",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        },
+        {
+          "cid": 4,
+          "name": "amount",
+          "type": "REAL",
+          "notnull": false,
+          "default": null,
+          "pk": false
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "Employees",
+          "from": "emp_id",
+          "to": "emp_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ]
+    }
+  },
+  "COmpnay db": {}
 }

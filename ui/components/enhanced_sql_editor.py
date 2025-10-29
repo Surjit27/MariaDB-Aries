@@ -14,7 +14,7 @@ if project_root not in sys.path:
 from ui.components.modern_theme import ModernTheme
 from sql_engine.simple_sql_compiler import SimpleSQLCompiler
 from ai.ai_pipeline import AIPipeline
-from ui.components.ai_query_assistant import AIQueryAssistant
+from ui.components.horizontal_ai_modal import HorizontalAIModal
 
 class EnhancedSQLEditor:
     def __init__(self, parent, db_manager, ai_integration):
@@ -36,8 +36,9 @@ class EnhancedSQLEditor:
         api_key = os.getenv('GEMINI_API_KEY', 'AIzaSyCcY01MZsIFwm1li0IAf_pk5knwo6emVjo')
         self.ai_pipeline = AIPipeline(db_manager, api_key)
         
-        # AI Query Assistant (will be initialized when needed)
-        self.ai_query_assistant = None
+        
+        # Horizontal AI Modal (will be initialized when needed)
+        self.horizontal_ai_modal = None
         
         self.create_widgets()
         
@@ -66,6 +67,7 @@ class EnhancedSQLEditor:
         self.create_toolbar_button(toolbar_frame, "🔧", "Compile", self.compile_sql, "Compile SQL (Ctrl+Shift+C)")
         self.create_toolbar_button(toolbar_frame, "🧹", "Clear", self.clear_editor, "Clear Editor (Ctrl+C)")
         self.create_toolbar_button(toolbar_frame, "🤖", "AI Generate", self.generate_sql, "AI Generate (Ctrl+G)")
+        self.create_toolbar_button(toolbar_frame, "💬", "AI Chat", self.show_horizontal_ai_modal, "AI Chat Assistant (Ctrl+Shift+A)")
         self.create_toolbar_button(toolbar_frame, "💡", "Explain", self.explain_sql, "Explain SQL")
         
         # Separator
@@ -271,6 +273,11 @@ class EnhancedSQLEditor:
         if event.state & 0x5 and event.keysym == "c":  # Ctrl+Shift+C
             self.compile_sql()
             return "break"
+        
+        # Handle Ctrl+Shift+A for horizontal AI modal
+        if event.state & 0x5 and event.keysym == "a":  # Ctrl+Shift+A
+            self.show_horizontal_ai_modal()
+            return "break"
     
     def on_click(self, event):
         """Handle click event."""
@@ -310,7 +317,7 @@ class EnhancedSQLEditor:
         context_menu.add_separator()
         
         # AI operations
-        context_menu.add_command(label="🤖 AI Query Assistant", command=lambda: self.show_ai_assistant(event))
+        context_menu.add_command(label="💬 AI Chat Assistant", command=lambda: self.show_horizontal_ai_modal())
         context_menu.add_command(label="💡 AI Explain", command=self.ai_explain)
         context_menu.add_command(label="🔧 AI Optimize", command=self.ai_optimize_query)
         context_menu.add_separator()
@@ -381,26 +388,6 @@ class EnhancedSQLEditor:
             else:
                 self.status_label.configure(text=f"'{search_text}' not found")
     
-    def show_ai_assistant(self, event):
-        """Show AI Query Assistant."""
-        # Get current query from editor
-        current_query = self.editor.get("1.0", tk.END).strip()
-        
-        # Create AI assistant if not exists
-        if not self.ai_query_assistant:
-            self.ai_query_assistant = AIQueryAssistant(
-                self.editor,
-                self.db_manager,
-                self.ai_pipeline,
-                self
-            )
-        
-        # Show assistant at cursor position
-        self.ai_query_assistant.show_assistant(
-            event.x_root if hasattr(event, 'x_root') else 100,
-            event.y_root if hasattr(event, 'y_root') else 100,
-            current_query if current_query else None
-        )
     
     def ai_optimize_query(self):
         """Optimize current query using AI."""
@@ -411,29 +398,12 @@ class EnhancedSQLEditor:
             query_to_optimize = self.editor.get("1.0", tk.END).strip()
         
         if query_to_optimize and self.ai_pipeline.is_available():
-            # Create a fake event for the assistant
-            fake_event = type('Event', (), {'x_root': self.editor.winfo_rootx() + 100, 'y_root': self.editor.winfo_rooty() + 100})()
-            
-            # Create AI assistant if not exists
-            if not self.ai_query_assistant:
-                self.ai_query_assistant = AIQueryAssistant(
-                    self.editor,
-                    self.db_manager,
-                    self.ai_pipeline,
-                    self
-                )
-            
-            # Show assistant with optimization mode
-            self.ai_query_assistant.show_assistant(
-                fake_event.x_root,
-                fake_event.y_root,
-                query_to_optimize
-            )
+            # Show horizontal AI modal with optimization prompt
+            self.show_horizontal_ai_modal()
             # Pre-fill with optimization prompt
-            if hasattr(self.ai_query_assistant, 'chat_input'):
-                self.ai_query_assistant.chat_input.delete("1.0", tk.END)
-                self.ai_query_assistant.chat_input.insert("1.0", "Optimize this query for better performance")
-                self.ai_query_assistant.chat_input.config(fg="#ffffff")
+            if hasattr(self.horizontal_ai_modal, 'input_entry'):
+                self.horizontal_ai_modal.input_entry.delete(0, tk.END)
+                self.horizontal_ai_modal.input_entry.insert(0, f"Optimize this query for better performance: {query_to_optimize}")
         else:
             self.status_label.configure(text="Please select or write a query to optimize")
     
@@ -442,13 +412,12 @@ class EnhancedSQLEditor:
         try:
             selected_text = self.editor.get(tk.SEL_FIRST, tk.SEL_LAST)
             if selected_text:
-                if self.ai_integration:
-                    explanation = self.ai_integration.explain_sql(selected_text)
-                    # Show explanation in a popup
-                    from tkinter import messagebox
-                    messagebox.showinfo("AI Explanation", explanation)
-                else:
-                    self.status_label.configure(text="AI integration not available")
+                # Show horizontal AI modal with explanation prompt
+                self.show_horizontal_ai_modal()
+                # Pre-fill with explanation prompt
+                if hasattr(self.horizontal_ai_modal, 'input_entry'):
+                    self.horizontal_ai_modal.input_entry.delete(0, tk.END)
+                    self.horizontal_ai_modal.input_entry.insert(0, f"Explain this SQL query: {selected_text}")
             else:
                 self.status_label.configure(text="Please select SQL text to explain")
         except:
@@ -993,6 +962,32 @@ class EnhancedSQLEditor:
     def set_sidebar(self, sidebar):
         """Set reference to sidebar."""
         self.sidebar = sidebar
+    
+    def show_horizontal_ai_modal(self):
+        """Show the horizontal AI modal."""
+        # Create horizontal AI modal if not exists
+        if not self.horizontal_ai_modal:
+            self.horizontal_ai_modal = HorizontalAIModal(
+                self.parent,
+                self.ai_integration,
+                self,
+                self.db_manager
+            )
+        
+        # Show modal at cursor position
+        cursor_pos = self.editor.index(tk.INSERT)
+        bbox = self.editor.bbox(cursor_pos)
+        if bbox is not None:
+            x, y, width, height = bbox
+            # Convert to root coordinates
+            root_x = self.editor.winfo_rootx() + x
+            root_y = self.editor.winfo_rooty() + y + 20
+            self.horizontal_ai_modal.show_at_position(root_x, root_y)
+        else:
+            # Fallback to center of editor
+            center_x = self.editor.winfo_rootx() + self.editor.winfo_width() // 2
+            center_y = self.editor.winfo_rooty() + self.editor.winfo_height() // 2
+            self.horizontal_ai_modal.show_at_position(center_x, center_y)
     
     def _handle_create_database(self, query: str):
         """Handle CREATE DATABASE command."""

@@ -22,7 +22,7 @@ class GeminiIntegration:
         """Initialize the Gemini integration."""
         self.api_key = os.getenv('GEMINI_API_KEY')
         self.model_name = os.getenv('AI_MODEL', 'gemini-2.5-flash')
-        self.max_tokens = int(os.getenv('AI_MAX_TOKENS', '1000'))
+        self.max_tokens = int(os.getenv('AI_MAX_TOKENS', '4000'))
         self.temperature = float(os.getenv('AI_TEMPERATURE', '0.7'))
         
         if not self.api_key:
@@ -42,6 +42,39 @@ class GeminiIntegration:
     def is_available(self) -> bool:
         """Check if AI integration is available."""
         return self.model is not None
+    
+    def _get_response_text(self, response) -> str:
+        """Extract text from Gemini response, handling both simple and complex responses."""
+        print(f"🔍 Response object type: {type(response)}")
+        print(f"🔍 Response attributes: {dir(response)}")
+        
+        try:
+            # Try the simple text accessor first
+            text = response.text
+            print(f"🔍 Simple text accessor worked: {repr(text)}")
+            return text
+        except ValueError as e:
+            print(f"🔍 Simple text accessor failed: {e}")
+            # If that fails, use the parts accessor
+            try:
+                if hasattr(response, 'parts') and response.parts:
+                    print(f"🔍 Using parts accessor, {len(response.parts)} parts")
+                    text = ''.join(part.text for part in response.parts if hasattr(part, 'text'))
+                    print(f"🔍 Parts text: {repr(text)}")
+                    return text
+                elif hasattr(response, 'candidates') and response.candidates:
+                    print(f"🔍 Using candidates accessor, {len(response.candidates)} candidates")
+                    candidate = response.candidates[0]
+                    if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                        print(f"🔍 Candidate content parts: {len(candidate.content.parts)}")
+                        text = ''.join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
+                        print(f"🔍 Candidate text: {repr(text)}")
+                        return text
+                print(f"🔍 Fallback to str(response): {str(response)}")
+                return str(response)
+            except Exception as e:
+                print(f"Error extracting response text: {e}")
+                return "Error: Could not extract response text"
     
     def generate_sql_query(self, user_prompt: str, database_schema: Dict[str, Any] = None, 
                           context: Optional[str] = None) -> Optional[str]:
@@ -72,17 +105,27 @@ class GeminiIntegration:
             # Generate the prompt for Gemini
             prompt = self._create_structured_prompt(ai_request)
             
-            # Generate response from Gemini
+            # Generate response from Gemini with better configuration
             response = self.model.generate_content(
                 prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=self.temperature,
                     max_output_tokens=self.max_tokens,
+                    candidate_count=1,
+                    stop_sequences=None,  # Don't stop early
                 )
             )
             
             # Parse the response and return just the SQL query
-            sql_response = self._parse_gemini_response(response.text)
+            response_text = self._get_response_text(response)
+            print(f"🔍 Raw AI Response: {repr(response_text)}")
+            print(f"🔍 Response Length: {len(response_text)}")
+            print(f"🔍 Response Lines: {response_text.count(chr(10)) + 1}")
+            
+            sql_response = self._parse_gemini_response(response_text)
+            print(f"🔍 Parsed SQL Query: {repr(sql_response.query)}")
+            print(f"🔍 Parsed Query Length: {len(sql_response.query)}")
+            
             return sql_response.query
             
         except Exception as e:
@@ -169,43 +212,73 @@ SQL QUERY:
     
     def _parse_gemini_response(self, response_text: str) -> SQLQueryResponse:
         """Parse Gemini response and return structured SQL query response."""
+        print(f"🔍 Parsing response text: {repr(response_text)}")
+        
         try:
             # Try to extract JSON from the response
             if "```json" in response_text:
+                print("🔍 Found ```json markers")
                 json_start = response_text.find("```json") + 7
                 json_end = response_text.find("```", json_start)
                 json_text = response_text[json_start:json_end].strip()
+                print(f"🔍 Extracted JSON: {repr(json_text)}")
             elif "```" in response_text:
+                print("🔍 Found ``` markers")
                 json_start = response_text.find("```") + 3
                 json_end = response_text.find("```", json_start)
                 json_text = response_text[json_start:json_end].strip()
+                print(f"🔍 Extracted JSON: {repr(json_text)}")
             else:
+                print("🔍 No code blocks found, looking for JSON object")
                 # Try to find JSON object in the response
                 json_start = response_text.find("{")
                 json_end = response_text.rfind("}") + 1
                 json_text = response_text[json_start:json_end]
+                print(f"🔍 Extracted JSON: {repr(json_text)}")
             
             # Parse JSON
             response_data = json.loads(json_text)
+            print(f"🔍 Parsed JSON data: {response_data}")
             
             # Create SQLQueryResponse object
             return SQLQueryResponse(**response_data)
             
         except (json.JSONDecodeError, KeyError, ValueError) as e:
+            print(f"🔍 JSON parsing failed: {e}")
+            print("🔍 Using fallback: extract just the SQL query")
+            
             # Fallback: extract just the SQL query
             lines = response_text.split('\n')
+            print(f"🔍 Response has {len(lines)} lines")
+            
             sql_query = ""
-            for line in lines:
+            in_sql = False
+            for i, line in enumerate(lines):
                 line = line.strip()
+                print(f"🔍 Line {i}: {repr(line)}")
+                
+                # Check if this line starts a SQL statement
                 if line.upper().startswith(('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER')):
+                    in_sql = True
                     sql_query = line
+                    print(f"🔍 Found SQL start: {line}")
+                elif in_sql and line:  # Continue collecting SQL lines
+                    sql_query += " " + line
+                    print(f"🔍 Adding to SQL: {line}")
+                elif in_sql and not line:  # Empty line, continue
+                    sql_query += "\n"
+                elif in_sql and not line.upper().startswith(('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER')):
+                    # End of SQL statement
                     break
             
-            if not sql_query:
+            print(f"🔍 Final SQL query: {repr(sql_query.strip())}")
+            
+            if not sql_query.strip():
                 sql_query = "SELECT 1"  # Fallback query
+                print("🔍 Using fallback query")
             
             return SQLQueryResponse(
-                query=sql_query,
+                query=sql_query.strip(),
                 query_type=QueryType.SELECT,
                 explanation="Generated SQL query from natural language prompt",
                 tables_involved=[],
@@ -237,7 +310,7 @@ Keep the explanation under 200 words.
 """
             
             response = self.model.generate_content(prompt)
-            return response.text.strip()
+            return self._get_response_text(response).strip()
             
         except Exception as e:
             return f"Error explaining SQL query: {str(e)}"
@@ -257,7 +330,8 @@ Provide 3-5 completion suggestions. Return only the SQL keywords or phrases, one
 """
             
             response = self.model.generate_content(prompt)
-            suggestions = [line.strip() for line in response.text.split('\n') if line.strip()]
+            response_text = self._get_response_text(response)
+            suggestions = [line.strip() for line in response_text.split('\n') if line.strip()]
             return suggestions[:5]  # Limit to 5 suggestions
             
         except Exception as e:
