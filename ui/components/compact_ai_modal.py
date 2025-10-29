@@ -131,6 +131,11 @@ class CompactAIModal:
         self.modal_window.bind("<FocusOut>", self._on_modal_focus_out)
         self.modal_window.bind("<Button-1>", self._on_modal_click)
         
+        # Bind click events to SQL editor to remove highlights
+        if hasattr(self.sql_editor, 'editor'):
+            self.sql_editor.editor.bind("<Button-1>", self.on_editor_click)
+            self.sql_editor.editor.bind("<Key>", self.on_editor_key)
+        
         # Focus and select text
         self.input_entry.focus()
         self.input_entry.select_range(0, tk.END)
@@ -263,10 +268,13 @@ class CompactAIModal:
             if self.ai_integration:
                 generated_sql = self.ai_integration.generate_sql_query(prompt, schema)
                 if generated_sql:
-                    # Insert generated SQL into editor
+                    # Insert generated SQL into editor with highlighting
                     if self.sql_editor and hasattr(self.sql_editor, 'editor'):
                         self.sql_editor.editor.delete("1.0", tk.END)
                         self.sql_editor.editor.insert("1.0", generated_sql)
+                        
+                        # Highlight the generated SQL
+                        self.highlight_generated_sql()
                     
                     # Show success and hide modal
                     self.input_entry.configure(state="normal")
@@ -280,6 +288,49 @@ class CompactAIModal:
         except Exception as e:
             self._show_error(f"❌ Error: {str(e)}")
             
+    def highlight_generated_sql(self):
+        """Highlight the generated SQL in the editor."""
+        try:
+            if self.sql_editor and hasattr(self.sql_editor, 'editor'):
+                # Configure highlighting tags
+                self.sql_editor.editor.tag_configure("ai_generated", 
+                                                    background="#2d4a2d",  # Dark green background
+                                                    foreground="#90EE90",  # Light green text
+                                                    relief="raised",
+                                                    borderwidth=1)
+                
+                # Apply highlight to entire content
+                self.sql_editor.editor.tag_add("ai_generated", "1.0", tk.END)
+                
+                # Auto-remove highlight after 5 seconds
+                self.modal_window.after(5000, lambda: self.remove_highlight("ai_generated"))
+        except Exception as e:
+            print(f"Error highlighting generated SQL: {e}")
+    
+    def remove_highlight(self, tag_name):
+        """Remove highlighting from text."""
+        try:
+            if self.sql_editor and hasattr(self.sql_editor, 'editor'):
+                self.sql_editor.editor.tag_remove(tag_name, "1.0", tk.END)
+        except Exception as e:
+            print(f"Error removing highlight: {e}")
+    
+    def remove_all_highlights(self):
+        """Remove all AI-related highlights."""
+        try:
+            if self.sql_editor and hasattr(self.sql_editor, 'editor'):
+                self.sql_editor.editor.tag_remove("ai_generated", "1.0", tk.END)
+        except Exception as e:
+            print(f"Error removing highlights: {e}")
+    
+    def on_editor_click(self, event):
+        """Handle click events in the SQL editor to remove highlights."""
+        self.remove_all_highlights()
+    
+    def on_editor_key(self, event):
+        """Handle key events in the SQL editor to remove highlights."""
+        self.remove_all_highlights()
+    
     def _show_error(self, message):
         """Show error message in the input field."""
         self.input_entry.configure(state="normal")
@@ -433,10 +484,13 @@ class CompactAITooltip:
             if self.ai_integration:
                 generated_sql = self.ai_integration.generate_sql_query(prompt, schema)
                 if generated_sql:
-                    # Insert into editor
+                    # Insert into editor with highlighting
                     if self.sql_editor and hasattr(self.sql_editor, 'editor'):
                         self.sql_editor.editor.delete("1.0", tk.END)
                         self.sql_editor.editor.insert("1.0", generated_sql)
+                        
+                        # Highlight the generated SQL
+                        self.highlight_generated_sql()
                     
                     # Show success
                     self.input_entry.configure(state="normal")
@@ -450,6 +504,33 @@ class CompactAITooltip:
         except Exception as e:
             self._show_error("❌ Error")
             
+    def highlight_generated_sql(self):
+        """Highlight the generated SQL in the editor."""
+        try:
+            if self.sql_editor and hasattr(self.sql_editor, 'editor'):
+                # Configure highlighting tags
+                self.sql_editor.editor.tag_configure("ai_generated", 
+                                                    background="#2d4a2d",  # Dark green background
+                                                    foreground="#90EE90",  # Light green text
+                                                    relief="raised",
+                                                    borderwidth=1)
+                
+                # Apply highlight to entire content
+                self.sql_editor.editor.tag_add("ai_generated", "1.0", tk.END)
+                
+                # Auto-remove highlight after 5 seconds
+                self.tooltip_window.after(5000, lambda: self.remove_highlight("ai_generated"))
+        except Exception as e:
+            print(f"Error highlighting generated SQL: {e}")
+    
+    def remove_highlight(self, tag_name):
+        """Remove highlighting from text."""
+        try:
+            if self.sql_editor and hasattr(self.sql_editor, 'editor'):
+                self.sql_editor.editor.tag_remove(tag_name, "1.0", tk.END)
+        except Exception as e:
+            print(f"Error removing highlight: {e}")
+    
     def _show_error(self, message):
         """Show error message."""
         self.input_entry.configure(state="normal")

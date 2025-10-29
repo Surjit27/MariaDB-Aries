@@ -102,6 +102,11 @@ class HorizontalAIModal:
         # Bind events
         self.bind_events()
         
+        # Bind click events to SQL editor to remove highlights
+        if hasattr(self.sql_editor, 'editor'):
+            self.sql_editor.editor.bind("<Button-1>", self.on_editor_click)
+            self.sql_editor.editor.bind("<Key>", self.on_editor_key)
+        
         # Focus and select text
         self.input_entry.focus()
         self.input_entry.select_range(0, tk.END)
@@ -569,12 +574,17 @@ class HorizontalAIModal:
             self.history_text.config(state=tk.DISABLED)
             
     def get_selected_text_from_editor(self):
-        """Get selected text from the SQL editor."""
+        """Get selected text from the SQL editor and highlight it."""
         try:
             # Check if there's a selection in the editor
             if hasattr(self.sql_editor, 'editor'):
                 selected_text = self.sql_editor.editor.get(tk.SEL_FIRST, tk.SEL_LAST)
-                return selected_text.strip() if selected_text else None
+                if selected_text:
+                    # Highlight the selected text
+                    sel_start = self.sql_editor.editor.index(tk.SEL_FIRST)
+                    sel_end = self.sql_editor.editor.index(tk.SEL_LAST)
+                    self.highlight_selected_text(sel_start, sel_end)
+                    return selected_text.strip()
         except tk.TclError:
             # No selection
             pass
@@ -745,6 +755,10 @@ Generate the complete SQL query now:
         """Apply generated SQL to the editor."""
         self.sql_editor.editor.delete("1.0", tk.END)
         self.sql_editor.editor.insert("1.0", sql)
+        
+        # Highlight the entire replaced content
+        end_pos = self.sql_editor.editor.index(f"1.0+{len(sql)}c")
+        self.highlight_replaced_text("1.0", end_pos)
     
     def insert_at_cursor(self, sql):
         """Insert SQL at the current cursor position with proper spacing."""
@@ -760,6 +774,10 @@ Generate the complete SQL query now:
         sql = sql + "\n"
         
         self.sql_editor.editor.insert(cursor_pos, sql)
+        
+        # Highlight the inserted text
+        new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(sql)}c")
+        self.highlight_replaced_text(cursor_pos, new_end)
     
     def is_query_complete(self, sql):
         """Check if the SQL query appears to be complete."""
@@ -796,6 +814,67 @@ Generate the complete SQL query now:
             return True
         
         return True  # Default to complete if we can't determine
+    
+    def highlight_replaced_text(self, start_pos, end_pos):
+        """Highlight replaced/inserted text with a special color."""
+        try:
+            # Configure highlighting tags
+            self.sql_editor.editor.tag_configure("ai_replaced", 
+                                                background="#2d4a2d",  # Dark green background
+                                                foreground="#90EE90",  # Light green text
+                                                relief="raised",
+                                                borderwidth=1)
+            
+            # Apply the highlight tag
+            self.sql_editor.editor.tag_add("ai_replaced", start_pos, end_pos)
+            
+            # Auto-remove highlight after 5 seconds
+            self.modal_window.after(5000, lambda: self.remove_highlight("ai_replaced"))
+            
+        except Exception as e:
+            print(f"Error highlighting text: {e}")
+    
+    def highlight_selected_text(self, start_pos, end_pos):
+        """Highlight selected text with a different color."""
+        try:
+            # Configure selection highlighting tags with more visible colors
+            self.sql_editor.editor.tag_configure("ai_selected", 
+                                                background="#8B0000",  # Dark red background
+                                                foreground="#FFFFFF",  # White text for better contrast
+                                                relief="raised",
+                                                borderwidth=2)
+            
+            # Apply the highlight tag
+            self.sql_editor.editor.tag_add("ai_selected", start_pos, end_pos)
+            
+            # Auto-remove highlight after 3 seconds
+            self.modal_window.after(3000, lambda: self.remove_highlight("ai_selected"))
+            
+        except Exception as e:
+            print(f"Error highlighting selected text: {e}")
+    
+    def remove_highlight(self, tag_name):
+        """Remove highlighting from text."""
+        try:
+            self.sql_editor.editor.tag_remove(tag_name, "1.0", tk.END)
+        except Exception as e:
+            print(f"Error removing highlight: {e}")
+    
+    def remove_all_highlights(self):
+        """Remove all AI-related highlights."""
+        try:
+            self.sql_editor.editor.tag_remove("ai_selected", "1.0", tk.END)
+            self.sql_editor.editor.tag_remove("ai_replaced", "1.0", tk.END)
+        except Exception as e:
+            print(f"Error removing highlights: {e}")
+    
+    def on_editor_click(self, event):
+        """Handle click events in the SQL editor to remove highlights."""
+        self.remove_all_highlights()
+    
+    def on_editor_key(self, event):
+        """Handle key events in the SQL editor to remove highlights."""
+        self.remove_all_highlights()
     
     def try_alternative_generation(self, prompt, schema, selected_text):
         """Try alternative generation approach for very short queries."""
@@ -857,17 +936,36 @@ Generate the complete SQL query now:
             
             # Check if there's a selection
             if self.sql_editor.editor.tag_ranges(tk.SEL):
+                # Get selection range for highlighting
+                sel_start = self.sql_editor.editor.index(tk.SEL_FIRST)
+                sel_end = self.sql_editor.editor.index(tk.SEL_LAST)
+                
                 # Replace the selected text
                 self.sql_editor.editor.delete(tk.SEL_FIRST, tk.SEL_LAST)
+                insert_pos = self.sql_editor.editor.index(tk.INSERT)
                 self.sql_editor.editor.insert(tk.INSERT, sql)
+                
+                # Calculate new end position after insertion
+                new_end = self.sql_editor.editor.index(f"{insert_pos}+{len(sql)}c")
+                
+                # Highlight the replaced text with a different color
+                self.highlight_replaced_text(insert_pos, new_end)
             else:
                 # No selection, insert at cursor position
                 cursor_pos = self.sql_editor.editor.index(tk.INSERT)
                 self.sql_editor.editor.insert(cursor_pos, sql)
+                
+                # Highlight the inserted text
+                new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(sql)}c")
+                self.highlight_replaced_text(cursor_pos, new_end)
         except tk.TclError:
             # Fallback: insert at cursor position
             cursor_pos = self.sql_editor.editor.index(tk.INSERT)
             self.sql_editor.editor.insert(cursor_pos, sql)
+            
+            # Highlight the inserted text
+            new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(sql)}c")
+            self.highlight_replaced_text(cursor_pos, new_end)
         
     def show_sql_popup(self, sql):
         """Show generated SQL in a popup for manual copy."""

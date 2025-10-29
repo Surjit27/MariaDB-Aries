@@ -15,11 +15,18 @@ from ui.components.modern_theme import ModernTheme
 from ui.components.vscode_sidebar_new import VSCodeSidebar
 from ui.components.enhanced_sql_editor import EnhancedSQLEditor
 from ui.components.modern_modals import ModernModals
+from ui.components.settings_panel import SettingsPanel
 from utils.data_export_import import DataExportImport
+from utils.settings_manager import SettingsManager
 
 class DBMSWorkbench(ttk.Window):
     def __init__(self):
-        super().__init__(themename="darkly")  # Dark theme for MariaDB:Aries
+        # Initialize Settings Manager first
+        self.settings_manager = SettingsManager()
+        
+        # Get theme from settings
+        initial_theme = self.settings_manager.get_theme()
+        super().__init__(themename=initial_theme)
         self.title("MariaDB:Aries Version - SQL Compiler")
         
         # Initialize modern theme
@@ -28,8 +35,13 @@ class DBMSWorkbench(ttk.Window):
         self.geometry("1200x800")
         self.minsize(768, 600)  # Minimum size for responsive design
         
-        # Set API key directly for AI integration
-        os.environ['GEMINI_API_KEY'] = 'AIzaSyCcY01MZsIFwm1li0IAf_pk5knwo6emVjo'
+        # Set API key from settings or fallback
+        api_key = self.settings_manager.get_api_key_value()
+        if api_key:
+            os.environ['GEMINI_API_KEY'] = api_key
+        else:
+            # Fallback to hardcoded key if no settings
+            os.environ['GEMINI_API_KEY'] = 'AIzaSyCcY01MZsIFwm1li0IAf_pk5knwo6emVjo'
         
         # Initialize Enhanced Database Manager
         db_storage_path = os.path.join(os.getcwd(), "databases")
@@ -50,8 +62,8 @@ class DBMSWorkbench(ttk.Window):
         session_storage_path = os.path.join(os.getcwd(), "sessions")
         self.session_manager = SessionManager(session_storage_path)
         
-        # Theme variable
-        self.current_theme = "flatly"
+        # Theme variable - load from settings
+        self.current_theme = self.settings_manager.get_theme()
 
         self.create_ui()
 
@@ -119,6 +131,13 @@ class DBMSWorkbench(ttk.Window):
         self.schema_visualizer = SchemaVisualizer(self.schema_tab, self.db_manager)
         self.schema_visualizer.pack(fill=tk.BOTH, expand=True)
         
+        # Settings Tab
+        self.settings_tab = ttk.Frame(self.main_notebook)
+        self.main_notebook.add(self.settings_tab, text="⚙️ Settings")
+        self.settings_panel = SettingsPanel(self.settings_tab, self.settings_manager, 
+                                           self.on_theme_changed, self.on_api_key_changed)
+        self.settings_panel.pack(fill=tk.BOTH, expand=True)
+        
         
         # Status bar
         self.status_bar = ttk.Frame(self)
@@ -129,6 +148,21 @@ class DBMSWorkbench(ttk.Window):
         
         # Bind tab change event
         self.main_notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+    
+    def on_theme_changed(self, theme: str):
+        """Handle theme change from settings."""
+        self.current_theme = theme
+        self.style.theme_use(theme)
+        print(f"Theme changed to: {theme}")
+    
+    def on_api_key_changed(self):
+        """Handle API key change from settings."""
+        api_key = self.settings_manager.get_api_key_value()
+        if api_key:
+            os.environ['GEMINI_API_KEY'] = api_key
+            # Reinitialize AI integration with new key
+            self.ai_integration = GeminiIntegration()
+            print("API key updated and AI integration reinitialized")
     
     def create_favorites_tab(self):
         """Create the favorites tab."""
@@ -393,6 +427,7 @@ Recent Queries:
         self.bind("<Control-3>", lambda event: self.main_notebook.select(2))  # History
         self.bind("<Control-4>", lambda event: self.main_notebook.select(3))  # Favorites
         self.bind("<Control-5>", lambda event: self.main_notebook.select(4))  # Schema
+        self.bind("<Control-6>", lambda event: self.main_notebook.select(5))  # Settings
 
     def toggle_theme(self):
         """Toggle between light and dark themes."""
@@ -445,7 +480,7 @@ Recent Queries:
     def on_tab_changed(self, event):
         """Handle tab change event."""
         current_tab = self.main_notebook.index("current")
-        tab_names = ["SQL Editor", "Query Builder", "History", "Favorites", "Schema"]
+        tab_names = ["SQL Editor", "Query Builder", "History", "Favorites", "Schema", "Settings"]
         current_tab_name = tab_names[current_tab] if current_tab < len(tab_names) else "Unknown"
         
         # Update status bar
@@ -457,6 +492,8 @@ Recent Queries:
             self.query_history.refresh_data()
         elif current_tab == 4:  # Schema tab
             self.schema_visualizer.refresh_schema()
+        elif current_tab == 5:  # Settings tab
+            self.settings_panel.refresh_api_keys()
 
     def update_status(self, message: str):
         """Update status bar message."""
@@ -723,9 +760,8 @@ WHERE condition;
         text_widget.config(state=tk.DISABLED)
 
     def show_settings(self):
-        """Show settings dialog."""
-        from tkinter import messagebox
-        messagebox.showinfo("Settings", "Settings dialog will be implemented in future versions")
+        """Show settings tab."""
+        self.main_notebook.select(5)  # Settings tab
 
     def show_help(self):
         """Show help dialog."""
@@ -736,7 +772,7 @@ Keyboard Shortcuts:
 - Ctrl+R: Run SQL
 - Ctrl+C: Clear Editor
 - Ctrl+G: Generate SQL with AI
-- Ctrl+1-4: Switch tabs
+- Ctrl+1-6: Switch tabs (1=SQL Editor, 2=Query Builder, 3=History, 4=Favorites, 5=Schema, 6=Settings)
 
 Features:
 - Create and manage databases
@@ -745,6 +781,7 @@ Features:
 - Schema visualization
 - Data export/import
 - Query history and favorites
+- Settings with API key management and theme toggle
 
 For more help, check the documentation.
 """

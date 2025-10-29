@@ -264,5 +264,19 @@
     "status": "success",
     "database": "company_db;",
     "id": 38
+  },
+  {
+    "query": "CREATE TABLE DepartmentBudgets (\ndept_id TEXT NOT NULL,\nfiscal_year INTEGER NOT NULL,\nallocated_budget TEXT,\nlast_updated_date TEXT,\nbudget_id INTEGER PRIMARY KEY AUTOINCREMENT,\nFOREIGN KEY (dept_id) REFERENCES Departments(dept_id)\n)",
+    "timestamp": "2025-10-30T02:05:21.656394",
+    "status": "success",
+    "database": "company",
+    "id": 39
+  },
+  {
+    "query": "-- Current Database: company\n-- Ready to execute SQL queries\n\nCREATE TABLE DepartmentBudgets ( budget_id INTEGER PRIMARY KEY AUTOINCREMENT, dept_id TEXT NOT NULL, fiscal_year INTEGER NOT NULL, allocated_budget TEXT, last_updated_date TEXT, FOREIGN KEY (dept_id) REFERENCES Departments(dept_id) ); ```",
+    "timestamp": "2025-10-30T02:05:21.664472",
+    "status": "success",
+    "database": "company",
+    "id": 40
   }
 ]
