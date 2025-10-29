@@ -335,7 +335,7 @@ class SimpleSQLCompiler:
             else:
                 i += 1
         
-        return ' '.join(compiled_parts)
+        return constraints
     
     def _compile_constraint(self, constraint: str) -> str:
         """Compile table constraints."""
@@ -409,7 +409,6 @@ class SimpleSQLCompiler:
     
     def _compile_create_database(self, sql: str) -> str:
         """Compile CREATE DATABASE statement."""
-<<<<<<< HEAD
         # Extract database name
         import re
         match = re.search(r'CREATE\s+DATABASE\s+(\w+)', sql, re.IGNORECASE)

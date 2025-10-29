@@ -13,6 +13,8 @@ if project_root not in sys.path:
 
 from ui.components.modern_theme import ModernTheme
 from sql_engine.simple_sql_compiler import SimpleSQLCompiler
+from ai.ai_pipeline import AIPipeline
+from ui.components.ai_query_assistant import AIQueryAssistant
 
 class EnhancedSQLEditor:
     def __init__(self, parent, db_manager, ai_integration):
@@ -29,6 +31,13 @@ class EnhancedSQLEditor:
         
         # Initialize SQL compiler
         self.sql_compiler = SimpleSQLCompiler()
+        
+        # Initialize AI Pipeline
+        api_key = os.getenv('GEMINI_API_KEY', 'AIzaSyCcY01MZsIFwm1li0IAf_pk5knwo6emVjo')
+        self.ai_pipeline = AIPipeline(db_manager, api_key)
+        
+        # AI Query Assistant (will be initialized when needed)
+        self.ai_query_assistant = None
         
         self.create_widgets()
         
@@ -301,8 +310,9 @@ class EnhancedSQLEditor:
         context_menu.add_separator()
         
         # AI operations
-        context_menu.add_command(label="🤖 AI Generate", command=self.ai_generate_popup)
+        context_menu.add_command(label="🤖 AI Query Assistant", command=lambda: self.show_ai_assistant(event))
         context_menu.add_command(label="💡 AI Explain", command=self.ai_explain)
+        context_menu.add_command(label="🔧 AI Optimize", command=self.ai_optimize_query)
         context_menu.add_separator()
         
         # SQL operations
@@ -371,13 +381,61 @@ class EnhancedSQLEditor:
             else:
                 self.status_label.configure(text=f"'{search_text}' not found")
     
-    def ai_generate_popup(self):
-        """Show AI generate popup."""
-        from ui.components.ai_popup import AIPopup
-        ai_popup = AIPopup(self.editor, self.ai_integration, self, self.db_manager)
-        # Create a fake event for the popup
-        fake_event = type('Event', (), {'x_root': self.editor.winfo_rootx() + 100, 'y_root': self.editor.winfo_rooty() + 100})()
-        ai_popup.show_popup(fake_event)
+    def show_ai_assistant(self, event):
+        """Show AI Query Assistant."""
+        # Get current query from editor
+        current_query = self.editor.get("1.0", tk.END).strip()
+        
+        # Create AI assistant if not exists
+        if not self.ai_query_assistant:
+            self.ai_query_assistant = AIQueryAssistant(
+                self.editor,
+                self.db_manager,
+                self.ai_pipeline,
+                self
+            )
+        
+        # Show assistant at cursor position
+        self.ai_query_assistant.show_assistant(
+            event.x_root if hasattr(event, 'x_root') else 100,
+            event.y_root if hasattr(event, 'y_root') else 100,
+            current_query if current_query else None
+        )
+    
+    def ai_optimize_query(self):
+        """Optimize current query using AI."""
+        try:
+            selected_text = self.editor.get(tk.SEL_FIRST, tk.SEL_LAST)
+            query_to_optimize = selected_text
+        except:
+            query_to_optimize = self.editor.get("1.0", tk.END).strip()
+        
+        if query_to_optimize and self.ai_pipeline.is_available():
+            # Create a fake event for the assistant
+            fake_event = type('Event', (), {'x_root': self.editor.winfo_rootx() + 100, 'y_root': self.editor.winfo_rooty() + 100})()
+            
+            # Create AI assistant if not exists
+            if not self.ai_query_assistant:
+                self.ai_query_assistant = AIQueryAssistant(
+                    self.editor,
+                    self.db_manager,
+                    self.ai_pipeline,
+                    self
+                )
+            
+            # Show assistant with optimization mode
+            self.ai_query_assistant.show_assistant(
+                fake_event.x_root,
+                fake_event.y_root,
+                query_to_optimize
+            )
+            # Pre-fill with optimization prompt
+            if hasattr(self.ai_query_assistant, 'chat_input'):
+                self.ai_query_assistant.chat_input.delete("1.0", tk.END)
+                self.ai_query_assistant.chat_input.insert("1.0", "Optimize this query for better performance")
+                self.ai_query_assistant.chat_input.config(fg="#ffffff")
+        else:
+            self.status_label.configure(text="Please select or write a query to optimize")
     
     def ai_explain(self):
         """Explain selected SQL."""
