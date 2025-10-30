@@ -22,8 +22,13 @@ from ai.ai_pipeline import AIPipeline
 class HorizontalAIModal:
     """
     A compact, horizontal tooltip-style AI modal that appears on demand.
-    Features table/column selection with @ and # triggers, conversation history,
-    and confirmation prompts before overwriting content.
+    Features:
+    - Inline chat interface like Cursor's AI assistant
+    - Code suggestions with Keep/Discard buttons
+    - Visual highlighting for old code (red) and applied code (green)
+    - Smooth UI transitions with fade/slide animations
+    - No popup confirmations - all actions inline
+    - Table/column selection with @ and # triggers
     """
     
     def __init__(self, parent, ai_integration, sql_editor, db_manager):
@@ -43,25 +48,58 @@ class HorizontalAIModal:
         # UI components
         self.input_entry = None
         self.history_frame = None
+        self.chat_frame = None
+        self.chat_text = None
+        self.chat_scrollbar = None
+        self.chat_messages = []
         self.table_dropdown = None
         self.column_dropdown = None
         self.dropdown_window = None
         self.current_dropdown_type = None
+        self.suggestion_buttons = {}  # Track active suggestion buttons
+        self.inline_buttons = {}  # Track inline suggestion buttons
         
         # Configuration
         self.modal_width = 800
         self.modal_height = 120
-        self.history_height = 200
+        self.chat_height = 300
         self.auto_hide_delay = 10000  # 10 seconds
+        self.chat_expanded = False
+        
+        # Runtime flags/state
+        self.warning_active = False
+        
+        # Selection mode state
+        self.selection_text = None
+        self.selection_mode = False
+        self.selection_mode_label = None
+        
+        # Auto-resize thresholds
+        self._max_chat_extra_px = 360  # maximum additional height for chat area
+        self._base_modal_height = self.modal_height
+        self._min_chat_extra_px = 36   # minimal visible chat height for very short messages
         
     def show_modal(self, event=None, position=None):
-        """Show the horizontal AI modal with smart positioning."""
+        """Show the horizontal AI modal with smart positioning and selection mode detection."""
         if self.is_visible:
             self.hide_modal()
             return
-            
         self.is_visible = True
-        
+
+        # Detect SQL selection
+        self.selection_text = None
+        self.selection_mode = False
+        try:
+            sel = self.get_selected_text_from_editor()
+            if sel and self._is_valid_sql_selection(sel):
+                self.selection_text = sel
+                self.selection_mode = True
+            else:
+                self.selection_mode = False # fallback
+        except Exception as e:
+            print(f"Selection check error: {e}")
+            self.selection_mode = False
+            
         # Calculate position
         if position:
             x, y = position
@@ -99,6 +137,9 @@ class HorizontalAIModal:
         # Create the horizontal layout
         self.create_horizontal_layout(content_frame)
         
+        # Create chat interface
+        self.create_chat_interface(content_frame)
+        
         # Bind events
         self.bind_events()
         
@@ -110,6 +151,10 @@ class HorizontalAIModal:
         # Focus and select text
         self.input_entry.focus()
         self.input_entry.select_range(0, tk.END)
+        
+        # At the end, add the selection mode label if active
+        if self.selection_mode and hasattr(self, 'chat_frame'):
+            self._show_selection_mode_label(self.chat_frame)
         
     def create_horizontal_layout(self, parent):
         """Create the horizontal layout for the modal."""
@@ -138,7 +183,7 @@ class HorizontalAIModal:
         button_frame = tk.Frame(top_frame, bg="#2d2d2d")
         button_frame.pack(side=tk.RIGHT)
         
-        # Generate button
+        # Generate/Send button
         generate_btn = tk.Button(button_frame, text="▶", 
                                command=self.generate_sql,
                                bg="#007acc", fg="#ffffff", bd=0,
@@ -148,17 +193,6 @@ class HorizontalAIModal:
                                activeforeground="#ffffff",
                                relief="flat")
         generate_btn.pack(side=tk.LEFT, padx=(0, 3))
-        
-        # History toggle button
-        history_btn = tk.Button(button_frame, text="📜", 
-                              command=self.toggle_history,
-                              bg="#666666", fg="#ffffff", bd=0,
-                              font=("Arial", 9), 
-                              width=3, height=1,
-                              activebackground="#888888", 
-                              activeforeground="#ffffff",
-                              relief="flat")
-        history_btn.pack(side=tk.LEFT, padx=(0, 3))
         
         # Close button
         close_btn = tk.Button(button_frame, text="✕", 
@@ -171,12 +205,316 @@ class HorizontalAIModal:
                             relief="flat")
         close_btn.pack(side=tk.LEFT)
         
-        # Bottom row - Conversation history (initially hidden)
-        self.history_frame = tk.Frame(parent, bg="#2d2d2d")
-        # Will be packed when toggled
+    def create_chat_interface(self, parent):
+        """Create the chat interface with ScrolledText for inline messages."""
+        # Chat frame (initially hidden)
+        self.chat_frame = tk.Frame(parent, bg="#2d2d2d", height=0)
+        # Will be shown when chat_expanded is True
         
-        # Create history content
-        self.create_history_content()
+        # Create ScrolledText for chat display
+        chat_container = tk.Frame(self.chat_frame, bg="#2d2d2d")
+        chat_container.pack(fill=tk.BOTH, expand=True, padx=4, pady=3)
+        
+        # Scrollbar
+        self.chat_scrollbar = tk.Scrollbar(chat_container)
+        self.chat_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Text widget with rich text support
+        self.chat_text = tk.Text(chat_container, 
+                                 bg="#1e1e1e", 
+                                 fg="#ffffff",
+                                 font=("Consolas", 9),
+                                 wrap=tk.WORD,
+                                 yscrollcommand=self.chat_scrollbar.set,
+                                 highlightthickness=0,
+                                 relief="flat",
+                                 bd=0)
+        self.chat_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=0, pady=0)
+        self.chat_scrollbar.config(command=self.chat_text.yview)
+        
+        # Configure text tags for styling
+        self.configure_chat_tags()
+        
+        # Button tracking for inline suggestions
+        self.inline_buttons = {}
+        
+    def configure_chat_tags(self):
+        """Configure text tags for chat styling."""
+        # Role tags
+        self.chat_text.tag_configure("user_role", 
+                                     foreground="#007acc", 
+                                     font=("Arial", 9, "bold"),
+                                     spacing1=1, spacing2=1, spacing3=2)
+        self.chat_text.tag_configure("ai_role", 
+                                     foreground="#28a745", 
+                                     font=("Arial", 9, "bold"),
+                                     spacing1=1, spacing2=1, spacing3=2)
+        
+        # Content tags
+        self.chat_text.tag_configure("normal_text", 
+                                     foreground="#ffffff", 
+                                     font=("Consolas", 9),
+                                     spacing1=1, spacing2=1, spacing3=2)
+        
+        # Old code styling (red, italic) - compact margins
+        self.chat_text.tag_configure("old_code", 
+                                     foreground="#ff6b6b",
+                                     background="#4d0000",
+                                     font=("Consolas", 9, "italic"),
+                                     lmargin1=6, lmargin2=6,
+                                     spacing1=1, spacing2=1, spacing3=2)
+        
+        # New code styling (green) - compact margins
+        self.chat_text.tag_configure("new_code", 
+                                     foreground="#90EE90",
+                                     font=("Consolas", 9),
+                                     lmargin1=6, lmargin2=6,
+                                     spacing1=1, spacing2=1, spacing3=2)
+        
+        # AI suggestion label - subtle separation
+        self.chat_text.tag_configure("ai_suggestion_label", 
+                                     foreground="#17a2b8",
+                                     font=("Arial", 9, "bold"),
+                                     lmargin1=2, lmargin2=2,
+                                     spacing1=1, spacing2=1, spacing3=2)
+        
+        # Separator line - minimal spacing
+        self.chat_text.tag_configure("separator", 
+                                     foreground="#444444",
+                                     spacing1=1, spacing2=1, spacing3=2)
+        
+    def add_chat_message(self, role, content, suggestion_data=None):
+        """Add a message to the chat interface using ScrolledText with inline buttons."""
+        if not self.chat_expanded:
+            self.expand_chat()
+        
+        # Ensure chat_text exists
+        if not hasattr(self, 'chat_text'):
+            return
+        
+        # Role indicator
+        role_emoji = "👤" if role == "user" else "🤖"
+        role_tag = "user_role" if role == "user" else "ai_role"
+        
+        # Insert role header
+        self.chat_text.insert(tk.END, f"{role_emoji} {role.upper()}: ", role_tag)
+        
+        # Insert content
+        self.chat_text.insert(tk.END, f"{content}\n", "normal_text")
+        
+        # Add suggestion with inline buttons if provided
+        if suggestion_data:
+            self.add_code_suggestion_inline(suggestion_data)
+        
+        # Scroll to bottom and auto-resize (visual only)
+        self.chat_text.see(tk.END)
+        self._auto_resize_chat()
+        self._resize_to_content()
+        
+        # Store message info for tracking
+        self.chat_messages.append({
+            'role': role,
+            'content': content,
+            'suggestion_data': suggestion_data
+        })
+        
+        # Add smooth fade-in effect
+        self.animate_message_fade()
+    
+    def add_code_suggestion_inline(self, suggestion_data):
+        """Add code suggestion inline with Keep/Discard buttons using window_create."""
+        # Highlight old code in editor (red) if replacing existing code
+        if suggestion_data.get('old_start') and suggestion_data.get('old_end'):
+            self.highlight_old_code(suggestion_data['old_start'], suggestion_data['old_end'])
+        
+        # Add separator line
+        self.chat_text.insert(tk.END, "─" * 60 + "\n", "separator")
+        
+        # Add AI Suggestion label
+        self.chat_text.insert(tk.END, "💡 AI Suggestion:\n", "ai_suggestion_label")
+        
+        # Add old code (if exists) - only show if there's existing code to replace
+        if suggestion_data.get('old_code') and suggestion_data['old_code']:
+            old_code = suggestion_data['old_code']
+            if len(old_code) > 100:
+                old_code = old_code[:100] + "..."
+            self.chat_text.insert(tk.END, f"OLD: ", "ai_suggestion_label")
+            self.chat_text.insert(tk.END, f"{old_code}\n", "old_code")
+        
+        # Add new code - this should always exist
+        if suggestion_data.get('new_code'):
+            new_code = suggestion_data['new_code']
+            if suggestion_data.get('old_code') and suggestion_data['old_code']:
+                self.chat_text.insert(tk.END, f"NEW: ", "ai_suggestion_label")
+            self.chat_text.insert(tk.END, f"{new_code}\n", "new_code")
+        
+        # Tight spacer before buttons
+        self.chat_text.insert(tk.END, "\n", "normal_text")
+        
+        # Create Keep button
+        keep_btn = tk.Button(self.chat_text,
+                            text="✓ Keep",
+                            command=lambda: self.handle_keep_suggestion(suggestion_data),
+                            bg="#28a745", fg="#ffffff", bd=0,
+                            font=("Arial", 9, "bold"),
+                            width=8,
+                            height=1,
+                            activebackground="#218838",
+                            activeforeground="#ffffff",
+                            relief="flat")
+        
+        # Create Discard button
+        discard_btn = tk.Button(self.chat_text,
+                              text="✕ Discard",
+                              command=lambda: self.handle_discard_suggestion(suggestion_data),
+                              bg="#dc3545", fg="#ffffff", bd=0,
+                              font=("Arial", 9, "bold"),
+                              width=8,
+                              height=1,
+                              activebackground="#c82333",
+                              activeforeground="#ffffff",
+                              relief="flat")
+        
+        # Insert buttons inline using window_create
+        self.chat_text.window_create(tk.END, window=keep_btn)
+        self.chat_text.insert(tk.END, " ")
+        self.chat_text.window_create(tk.END, window=discard_btn)
+        self.chat_text.insert(tk.END, "\n", "normal_text")
+        
+        # Store button references for tracking
+        suggestion_id = f"suggestion_{len(self.chat_messages)}"
+        self.inline_buttons[suggestion_id] = {
+            'keep': keep_btn,
+            'discard': discard_btn,
+            'data': suggestion_data
+        }
+        
+        # Auto-resize after adding suggestion (visual only)
+        self._auto_resize_chat()
+        self._resize_to_content()
+    
+    def handle_keep_suggestion(self, suggestion_data):
+        """Handle Keep button click - apply suggestion to editor."""
+        try:
+            if suggestion_data.get('old_start') and suggestion_data.get('old_end'):
+                # Replace existing code
+                old_start = suggestion_data['old_start']
+                old_end = suggestion_data['old_end']
+                self.sql_editor.editor.delete(old_start, old_end)
+                self.sql_editor.editor.insert(old_start, suggestion_data['new_code'])
+                
+                # Highlight applied code in green
+                new_end = self.sql_editor.editor.index(f"{old_start}+{len(suggestion_data['new_code'])}c")
+                self.highlight_applied_code(old_start, new_end)
+            else:
+                # Insert at cursor
+                cursor_pos = self.sql_editor.editor.index(tk.INSERT)
+                self.sql_editor.editor.insert(cursor_pos, suggestion_data['new_code'])
+                
+                # Highlight applied code
+                new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(suggestion_data['new_code'])}c")
+                self.highlight_applied_code(cursor_pos, new_end)
+            
+            # Add confirmation message to chat
+            self.add_confirmation_message("✅ Change applied successfully")
+            
+            # Disable buttons
+            self.disable_suggestion_buttons(suggestion_data)
+            
+        except Exception as e:
+            print(f"Error applying suggestion: {e}")
+            self.add_confirmation_message(f"❌ Error applying suggestion: {str(e)}")
+    
+    def handle_discard_suggestion(self, suggestion_data):
+        """Handle Discard button click - ignore suggestion."""
+        # Remove any highlights from old code
+        if suggestion_data.get('old_start') and suggestion_data.get('old_end'):
+            self.remove_old_highlight(suggestion_data['old_start'], suggestion_data['old_end'])
+        
+        # Add discard message to chat
+        self.add_confirmation_message("❌ Change discarded")
+        
+        # Disable buttons
+        self.disable_suggestion_buttons(suggestion_data)
+    
+    def disable_suggestion_buttons(self, suggestion_data):
+        """Disable the Keep/Discard buttons after action."""
+        try:
+            for btn_id, btn_info in self.inline_buttons.items():
+                if btn_info['data'] == suggestion_data:
+                    btn_info['keep'].config(state=tk.DISABLED)
+                    btn_info['discard'].config(state=tk.DISABLED)
+                    break
+        except Exception as e:
+            print(f"Error disabling buttons: {e}")
+    
+    def add_confirmation_message(self, message):
+        """Add a confirmation message to chat."""
+        self.chat_text.insert(tk.END, f"{message}\n\n", "separator")
+        self.chat_text.see(tk.END)
+    
+    def animate_message_fade(self):
+        """Animate fade-in effect for new messages."""
+        try:
+            # Simple implementation using after
+            self.modal_window.after(50, lambda: self.modal_window.update())
+        except:
+            pass
+    
+    def expand_chat(self):
+        """Expand chat interface with animation."""
+        if self.chat_expanded:
+            return
+        
+        self.chat_expanded = True
+        
+        # Pack chat frame
+        self.chat_frame.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
+        
+        # Resize modal
+        new_height = self.modal_height + self.chat_height
+        self.modal_window.wm_geometry(f"{self.modal_width}x{new_height}")
+        
+        # Animate alpha transition
+        for alpha in range(950, 1001, 10):
+            self.modal_window.wm_attributes("-alpha", alpha / 1000)
+            self.modal_window.update()
+            time.sleep(0.01)
+    
+    def highlight_old_code(self, start_pos, end_pos):
+        """Highlight old code in red."""
+        try:
+            self.sql_editor.editor.tag_configure("ai_old", 
+                                                background="#4d0000",
+                                                foreground="#ffcccc",
+                                                relief="raised",
+                                                borderwidth=1)
+            self.sql_editor.editor.tag_add("ai_old", start_pos, end_pos)
+        except Exception as e:
+            print(f"Error highlighting old code: {e}")
+    
+    def highlight_applied_code(self, start_pos, end_pos):
+        """Highlight applied code in green."""
+        try:
+            self.sql_editor.editor.tag_configure("ai_applied", 
+                                                background="#004d00",
+                                                foreground="#ccffcc",
+                                                relief="raised",
+                                                borderwidth=1)
+            self.sql_editor.editor.tag_add("ai_applied", start_pos, end_pos)
+            
+            # Auto-remove after 3 seconds
+            self.modal_window.after(3000, lambda: self.remove_highlight("ai_applied"))
+        except Exception as e:
+            print(f"Error highlighting applied code: {e}")
+    
+    def remove_old_highlight(self, start_pos, end_pos):
+        """Remove old code highlight."""
+        try:
+            self.sql_editor.editor.tag_remove("ai_old", start_pos, end_pos)
+        except Exception as e:
+            print(f"Error removing old highlight: {e}")
+        
         
     def create_history_content(self):
         """Create the conversation history content."""
@@ -607,149 +945,178 @@ class HorizontalAIModal:
             self.history_text.config(state=tk.DISABLED)
             
     def generate_sql(self):
-        """Generate SQL using AI."""
+        """Generate SQL using AI with both selection-based (edit) and full prompt (normal) flows."""
+        # Reset per-trigger warning flag
+        self.warning_active = False
         prompt = self.input_var.get().strip()
-        if not prompt:
+        # Strict trigger rule: require prompt or valid selection
+        if not prompt and not getattr(self, 'selection_mode', False):
+            self._warn_once("⚠️ Please enter a query or select code before running AI Assistant.")
             return
-            
+        if not prompt and getattr(self, 'selection_mode', False) and not self.selection_text:
+            self._warn_once("⚠️ Please enter a query or select code before running AI Assistant.")
+            return
         # Show loading state
         self.input_entry.configure(state="disabled")
         self.input_var.set("🤖 Generating...")
         self.modal_window.update()
-        
         try:
-            # Get selected text from SQL editor
-            selected_text = self.get_selected_text_from_editor()
-            
-            # Get database schema for context
+            # Check if selection mode is active
+            if getattr(self, 'selection_mode', False) and (self.selection_text is not None):
+                seltext = self.selection_text.strip()
+                # Strict validation for partial/invalid selection
+                try:
+                    st = seltext.strip()
+                    if st and (not st.endswith(";") and not st.upper().startswith(("SELECT", "UPDATE", "INSERT", "DELETE"))):
+                        self._warn_once("⚠️ Please select a complete SQL statement.")
+                        self.input_entry.configure(state="normal")
+                        self.input_var.set("")
+                        return
+                except Exception:
+                    pass
+                # Build banner and targeted prompt
+                banner = "🧠 Editing selected code...\n\n"
+                ai_prompt = f"""
+Improve, fix, or optimize ONLY the following SQL query:
+
+{seltext}
+
+Return only the improved query, no explanations, code fences, or extra symbols.
+"""
+                # Prepare minimal schema (best-effort)
+                schema = None
+                if self.db_manager and self.db_manager.current_db:
+                    try:
+                        tables = self.db_manager.get_tables()
+                        table_schema = []
+                        for t in tables:
+                            try:
+                                cols, _ = self.db_manager.get_table_data(t, limit=1)
+                                table_schema.append({"table_name": t, "columns": [{"name": c, "type": "TEXT"} for c in cols]})
+                            except:
+                                table_schema.append({"table_name": t, "columns": []})
+                        schema = {"database_name": self.db_manager.current_db, "tables": table_schema, "relationships": []}
+                    except Exception as e:
+                        print(f"Schema (selection mode) error: {e}")
+                # Call AI
+                ai_sql = None
+                try:
+                    ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
+                except Exception as e:
+                    print(f"AI error: {e}")
+                # Handle empty/missing response
+                if not ai_sql or not str(ai_sql).strip():
+                    self._warn_once("⚠️ No response generated. Try rephrasing your query.")
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    return
+                # Clean and merge display
+                ai_sql_clean = self._clean_sql_display(ai_sql)
+                # Non-SQL detection on response
+                if not self._looks_like_sql(ai_sql_clean):
+                    self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    return
+                # If identical (ignoring whitespace and trailing semicolons), show no-change notice
+                def _norm(s):
+                    return (s or "").strip().rstrip(';').strip()
+                if _norm(ai_sql_clean) == _norm(seltext):
+                    self.add_chat_message("assistant", "No changes suggested for this selection.")
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    return
+                # Merge banner + SQL as single assistant line before suggestion block
+                merged = f"{banner}{ai_sql_clean}\n"
+                # Determine selection positions (best-effort)
+                sel_start, sel_end = None, None
+                try:
+                    sel_start = self.sql_editor.editor.index(tk.SEL_FIRST)
+                    sel_end = self.sql_editor.editor.index(tk.SEL_LAST)
+                except Exception:
+                    pass
+                # Show merged assistant text and suggestion block
+                self.add_chat_message("assistant", merged, {
+                    'old_code': seltext,
+                    'new_code': ai_sql_clean,
+                    'old_start': sel_start,
+                    'old_end': sel_end
+                })
+                self.input_entry.configure(state="normal")
+                self.input_var.set("")
+                if hasattr(self, 'chat_text'):
+                    self.chat_text.see('end')
+                return
+            # ---Fallback: no selection, default full prompt mode---
+            prompt_text = prompt
             schema = None
             if self.db_manager and self.db_manager.current_db:
                 try:
                     tables = self.db_manager.get_tables()
-                    # Create proper schema format for AI - tables should be list of dicts
                     table_schemas = []
                     for table_name in tables:
                         try:
-                            # Get table columns
                             columns, _ = self.db_manager.get_table_data(table_name, limit=1)
-                            table_schema = {
+                            table_schemas.append({
                                 "table_name": table_name,
                                 "columns": [{"name": col, "type": "TEXT"} for col in columns]
-                            }
-                            table_schemas.append(table_schema)
+                            })
                         except:
-                            # Fallback if we can't get columns
-                            table_schema = {
-                                "table_name": table_name,
-                                "columns": []
-                            }
-                            table_schemas.append(table_schema)
-                    
-                    schema = {
-                        "database_name": self.db_manager.current_db,
-                        "tables": table_schemas,
-                        "relationships": []
-                    }
-                except:
-                    pass
-            
-            # Generate SQL using AI
-            if self.ai_integration:
-                # Enhanced prompt to ensure complete queries
-                enhanced_prompt = f"""
-Generate a complete SQL query for the following request: {prompt}
-
-CRITICAL REQUIREMENTS:
-1. Provide a COMPLETE, executable SQL query
-2. Include proper syntax and formatting
-3. End with semicolon (;)
-4. Do NOT truncate or cut off the query
-5. If the query is complex, make sure ALL parts are included
-6. For CREATE TABLE statements, include ALL columns and constraints
-7. For INSERT statements, include ALL values
-8. For SELECT statements, include complete WHERE, ORDER BY, GROUP BY clauses if needed
-
-IMPORTANT: Generate the ENTIRE query, do not stop in the middle. The query must be complete and executable.
-
-Database context: {self.db_manager.current_db if self.db_manager.current_db else 'No database selected'}
-
-Generate the complete SQL query now:
-"""
-                
-                generated_sql = self.ai_integration.generate_sql_query(enhanced_prompt, schema)
-                if generated_sql:
-                    # Debug: Print the generated SQL to see what we're getting
-                    print(f"Generated SQL: {repr(generated_sql)}")
-                    print(f"SQL length: {len(generated_sql)}")
-                    
-                    # Check if query looks complete
-                    if self.is_query_complete(generated_sql):
-                        # Add to history
-                        self.add_to_history(prompt, generated_sql)
-                        
-                        # Show confirmation before applying
-                        self.show_confirmation_prompt(generated_sql, selected_text)
-                        
-                        # Show success
-                        self.input_entry.configure(state="normal")
-                        self.input_var.set("✅ Generated successfully!")
-                        self.modal_window.after(2000, lambda: self.input_var.set(""))
-                    else:
-                        # Query seems incomplete, try to get more complete version
-                        print(f"Incomplete query detected: {repr(generated_sql)}")
-                        
-                        # If query is very short (less than 50 chars), try again with different prompt
-                        if len(generated_sql.strip()) < 50:
-                            print("Query too short, trying again with different approach...")
-                            self.try_alternative_generation(prompt, schema, selected_text)
-                        else:
-                            self.handle_incomplete_query(generated_sql, prompt, selected_text)
-                else:
-                    self._show_error("❌ Failed to generate SQL")
-            else:
-                self._show_error("❌ AI not available")
-        except Exception as e:
-            self._show_error(f"❌ Error: {str(e)}")
-            
-    def show_confirmation_prompt(self, generated_sql, selected_text=None):
-        """Show confirmation prompt before overwriting content."""
-        if selected_text:
-            # There's selected text, replace only that
-            from tkinter import messagebox
-            response = messagebox.askyesno(
-                "Confirm Replace Selection",
-                f"Selected text:\n\n{selected_text[:100]}{'...' if len(selected_text) > 100 else ''}\n\nDo you want to replace it with the generated SQL?",
-                icon="question"
-            )
-            
-            if response:
-                self.replace_selected_text(generated_sql)
-            else:
-                # User declined, show the SQL in a popup for manual copy
-                self.show_sql_popup(generated_sql)
-        else:
-            # No selection, check if editor has content
-            current_content = self.sql_editor.editor.get("1.0", tk.END).strip()
-            if not current_content:
-                # No content, insert at cursor
-                self.insert_at_cursor(generated_sql)
+                            table_schemas.append({"table_name": table_name, "columns": []})
+                    schema = {"database_name": self.db_manager.current_db, "tables": table_schemas, "relationships": []}
+                except Exception as e:
+                    print(f"Schema extraction error: {e}")
+            if not prompt_text:
+                self._warn_once("⚠️ Please enter a query or select code before running AI Assistant.")
+                self.input_entry.configure(state="normal")
+                self.input_var.set("")
                 return
-                
-            # Show confirmation dialog with options
-            from tkinter import messagebox
-            response = messagebox.askyesnocancel(
-                "Insert Generated SQL",
-                f"The editor contains existing content.\n\nHow would you like to insert the generated SQL?",
-                detail="Yes: Insert at cursor position\nNo: Replace entire editor\nCancel: Show in popup for manual copy",
-                icon="question"
-            )
+            # Require clear SQL intent in prompt before calling AI
+            if not self._looks_like_sql(prompt_text):
+                self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
+                self.input_entry.configure(state="normal")
+                self.input_var.set("")
+                return
+            enhanced_prompt = f"""Generate a complete, executable SQL query for: {prompt_text}
+
+Requirements:
+- Return ONLY the SQL query, no explanations
+- Ensure the query is complete and ends with semicolon
+- Use proper SQLite syntax
+{f"- Database context: {self.db_manager.current_db}" if self.db_manager and self.db_manager.current_db else ""}
+"""
+            ai_sql = None
+            try:
+                ai_sql = self.ai_integration.generate_sql_query(enhanced_prompt, schema)
+            except Exception as e:
+                print(f"AI error: {e}")
+            # Assistant line should always show user request
+            self.add_chat_message("user", prompt_text)
+            if not ai_sql or not str(ai_sql).strip():
+                self._warn_once("⚠️ No response generated. Try rephrasing your query.")
+                self.input_entry.configure(state="normal")
+                self.input_var.set("")
+                return
+            ai_sql_clean = self._clean_sql_display(ai_sql)
+            if not self._looks_like_sql(ai_sql_clean):
+                self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
+                self.input_entry.configure(state="normal")
+                self.input_var.set("")
+                return
+            # Plain generated SQL: show single assistant line only (no suggestion block)
+            self.add_chat_message("assistant", ai_sql_clean)
+            self.input_entry.configure(state="normal")
+            self.input_var.set("")
+            if hasattr(self, 'chat_text'):
+                self.chat_text.see('end')
+        except Exception as e:
+            print(f"Error in generate_sql: {e}")
+            self.add_chat_message("assistant", f"⚠️ Error: {str(e)}")
+            self.input_entry.configure(state="normal")
+            self.input_var.set("")
             
-            if response is True:  # Yes - insert at cursor
-                self.insert_at_cursor(generated_sql)
-            elif response is False:  # No - replace entire editor
-                self.apply_sql(generated_sql)
-            else:  # Cancel - show popup
-                self.show_sql_popup(generated_sql)
+    # Old confirmation prompt method - now replaced by inline Keep/Discard buttons
+    # def show_confirmation_prompt(self, generated_sql, selected_text=None):
             
     def apply_sql(self, sql):
         """Apply generated SQL to the editor."""
@@ -779,41 +1146,7 @@ Generate the complete SQL query now:
         new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(sql)}c")
         self.highlight_replaced_text(cursor_pos, new_end)
     
-    def is_query_complete(self, sql):
-        """Check if the SQL query appears to be complete."""
-        sql = sql.strip()
-        
-        # Check basic completeness indicators
-        if not sql:
-            return False
-        
-        # Check if it ends with semicolon
-        if not sql.endswith(';'):
-            return False
-        
-        # Check for common incomplete patterns
-        incomplete_patterns = [
-            'SELECT * FROM',  # Missing WHERE clause
-            'WHERE',  # Missing condition
-            'ORDER BY',  # Missing column
-            'GROUP BY',  # Missing column
-            'HAVING',  # Missing condition
-            'JOIN',  # Missing table
-            'ON',  # Missing condition
-        ]
-        
-        for pattern in incomplete_patterns:
-            if sql.upper().endswith(pattern.upper()):
-                return False
-        
-        # Check if it has basic SQL structure
-        sql_upper = sql.upper()
-        if 'SELECT' in sql_upper and 'FROM' in sql_upper:
-            return True
-        elif any(keyword in sql_upper for keyword in ['INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER']):
-            return True
-        
-        return True  # Default to complete if we can't determine
+    # Removed is_query_complete - no longer needed, we let the AI return what it can
     
     def highlight_replaced_text(self, start_pos, end_pos):
         """Highlight replaced/inserted text with a special color."""
@@ -876,55 +1209,8 @@ Generate the complete SQL query now:
         """Handle key events in the SQL editor to remove highlights."""
         self.remove_all_highlights()
     
-    def try_alternative_generation(self, prompt, schema, selected_text):
-        """Try alternative generation approach for very short queries."""
-        self.input_var.set("🔄 Trying alternative approach...")
-        self.modal_window.update()
-        
-        # Try a simpler, more direct prompt
-        simple_prompt = f"Write a complete SQL query for: {prompt}\n\nMake sure to include all necessary parts and end with semicolon."
-        
-        try:
-            generated_sql = self.ai_integration.generate_sql_query(simple_prompt, schema)
-            if generated_sql and len(generated_sql.strip()) > 50:
-                print(f"Alternative generation successful: {repr(generated_sql)}")
-                self.add_to_history(prompt, generated_sql)
-                self.show_confirmation_prompt(generated_sql, selected_text)
-                
-                self.input_entry.configure(state="normal")
-                self.input_var.set("✅ Generated successfully!")
-                self.modal_window.after(2000, lambda: self.input_var.set(""))
-            else:
-                print(f"Alternative generation also failed: {repr(generated_sql)}")
-                self.handle_incomplete_query(generated_sql or "Query generation failed", prompt, selected_text)
-        except Exception as e:
-            print(f"Alternative generation error: {e}")
-            self._show_error(f"❌ Error: {str(e)}")
-    
-    def handle_incomplete_query(self, partial_sql, original_prompt, selected_text):
-        """Handle incomplete query by asking user if they want to continue."""
-        from tkinter import messagebox
-        
-        response = messagebox.askyesno(
-            "Query May Be Incomplete",
-            f"The generated SQL appears to be incomplete:\n\n{partial_sql[:200]}{'...' if len(partial_sql) > 200 else ''}\n\nDo you want to:\n• Yes: Insert this partial query and continue\n• No: Try generating again",
-            icon="warning"
-        )
-        
-        if response:
-            # User wants to insert the partial query
-            self.add_to_history(original_prompt, partial_sql)
-            self.show_confirmation_prompt(partial_sql, selected_text)
-            
-            # Show success
-            self.input_entry.configure(state="normal")
-            self.input_var.set("✅ Partial query inserted - you can continue editing")
-            self.modal_window.after(3000, lambda: self.input_var.set(""))
-        else:
-            # User wants to try again
-            self.input_entry.configure(state="normal")
-            self.input_var.set("🔄 Trying again...")
-            self.modal_window.after(1000, self.generate_sql)
+    # Removed try_alternative_generation and handle_incomplete_query - no longer needed
+    # These methods caused UI spam with retry messages
     
     def replace_selected_text(self, sql):
         """Replace selected text in the editor with generated SQL."""
@@ -967,66 +1253,33 @@ Generate the complete SQL query now:
             new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(sql)}c")
             self.highlight_replaced_text(cursor_pos, new_end)
         
-    def show_sql_popup(self, sql):
-        """Show generated SQL in a popup for manual copy."""
-        popup = tk.Toplevel(self.modal_window)
-        popup.title("Generated SQL")
-        popup.geometry("600x400")
-        popup.configure(bg="#1e1e1e")
-        
-        # Make it modal
-        popup.transient(self.modal_window)
-        popup.grab_set()
-        
-        # Text area
-        text_frame = tk.Frame(popup, bg="#1e1e1e")
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        text_widget = tk.Text(text_frame, 
-                             font=("Consolas", 10),
-                             bg="#2d2d2d", fg="#ffffff",
-                             relief="flat", bd=1, wrap=tk.WORD)
-        text_widget.pack(fill=tk.BOTH, expand=True)
-        text_widget.insert("1.0", sql)
-        text_widget.config(state=tk.DISABLED)
-        
-        # Buttons
-        button_frame = tk.Frame(popup, bg="#1e1e1e")
-        button_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        copy_btn = tk.Button(button_frame, text="📋 Copy to Editor", 
-                           command=lambda: self.copy_to_editor(sql, popup),
-                           bg="#007acc", fg="#ffffff", bd=0,
-                           font=("Arial", 10))
-        copy_btn.pack(side=tk.LEFT, padx=5)
-        
-        close_btn = tk.Button(button_frame, text="Close", 
-                            command=popup.destroy,
-                            bg="#6c757d", fg="#ffffff", bd=0,
-                            font=("Arial", 10))
-        close_btn.pack(side=tk.RIGHT, padx=5)
-        
-    def copy_to_editor(self, sql, popup):
-        """Copy SQL to editor and close popup."""
-        # Insert at cursor position instead of replacing entire editor
-        self.insert_at_cursor(sql)
-        popup.destroy()
-        
-    def _show_error(self, message):
-        """Show error message in the input field."""
-        self.input_entry.configure(state="normal")
-        self.input_var.set(message)
-        self.modal_window.after(3000, lambda: self.input_var.set(""))
+    # Old popup methods removed - now using inline chat interface
+    # def show_sql_popup(self, sql):
+    # def copy_to_editor(self, sql, popup):
+    # def _show_error(self, message):
         
     def hide_modal(self):
-        """Hide the modal and clear history if configured."""
+        """Hide the modal and clear chat if configured."""
         if not self.is_visible or not self.modal_window:
             return
             
         self.is_visible = False
+        self.chat_expanded = False
         
         # Clear conversation history on close
-        self.clear_history()
+        self.conversation_history = []
+        self.chat_messages = []
+        self.suggestion_buttons = {}
+        self.inline_buttons = {}
+        
+        # Clear chat text if it exists
+        if hasattr(self, 'chat_text'):
+            self.chat_text.delete("1.0", tk.END)
+        
+        # Remove all highlights
+        if hasattr(self.sql_editor, 'editor'):
+            self.sql_editor.editor.tag_remove("ai_old", "1.0", tk.END)
+            self.sql_editor.editor.tag_remove("ai_applied", "1.0", tk.END)
         
         if self.modal_window and self.modal_window.winfo_exists():
             self.modal_window.destroy()
@@ -1069,3 +1322,106 @@ Generate the complete SQL query now:
     def is_modal_visible(self):
         """Check if modal is currently visible."""
         return self.is_visible and self.modal_window and self.modal_window.winfo_exists()
+
+    def _clean_sql_display(self, sql_text):
+        """Clean code fences and trailing punctuation for AI SQL responses shown inline."""
+        if not isinstance(sql_text, str):
+            return sql_text
+        text = sql_text.strip()
+        if not text:
+            return text
+        # Remove common markdown fences
+        text = text.replace("```sql", "").replace("```", "").strip()
+        # Drop any standalone fence lines or empty lines from the ends
+        lines = [l for l in text.splitlines() if l.strip() not in ("```sql", "```", "")]
+        cleaned = "\n".join(lines).strip('`\"\' + " ')
+        # Normalize trailing semicolons: collapse duplicates and ensure single if needed
+        while cleaned.endswith(";;"):
+            cleaned = cleaned[:-1].strip()
+        if cleaned and not cleaned.endswith(';'):
+            cleaned += ';'
+        return cleaned
+
+    def _show_selection_mode_label(self, parent):
+        # Place a label above the chat area in the modal if we're in selection mode
+        try:
+            label = tk.Label(parent, text='🧠 Editing selected code...',
+                             bg="#2d2d2d", fg="#17a2b8",
+                             font=("Arial", 9, "italic"), anchor="w")
+            label.pack(fill=tk.X, padx=6, pady=(3, 0), before=self.chat_frame.winfo_children()[0] if self.chat_frame.winfo_children() else None)
+            # Store for later hide (if needed)
+            self.selection_mode_label = label
+        except Exception as e:
+            print("Couldn't show selection mode label:", e)
+    
+    def _hide_selection_mode_label(self):
+        if hasattr(self, 'selection_mode_label') and self.selection_mode_label:
+            self.selection_mode_label.destroy()
+            self.selection_mode_label = None
+
+    def _is_valid_sql_selection(self, text):
+        """Check if selected text looks like a valid SQL query or statement."""
+        if not text or not isinstance(text, str):
+            return False
+        lowered = text.strip().lower()
+        sql_keywords = ['select', 'insert', 'update', 'delete', 'create', 'alter', 'drop']
+        if any(k in lowered for k in sql_keywords) and ';' in lowered:
+            return True
+        # Also allow single-line non-semicolon cases (e.g. CREATE TABLE ...)
+        if any(lowered.startswith(k) for k in sql_keywords) and len(lowered) > 10:
+            return True
+        return False
+
+    def _looks_like_sql(self, text):
+        """Heuristic check: does the text contain typical SQL patterns?"""
+        try:
+            if not text or not isinstance(text, str):
+                return False
+            up = text.upper()
+            patterns = [
+                'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP',
+                'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'JOIN'
+            ]
+            return any(p in up for p in patterns)
+        except Exception:
+            return False
+
+    def _warn_once(self, message_text):
+        try:
+            if getattr(self, 'warning_active', False):
+                return
+            self.add_chat_message("assistant", message_text)
+            self.warning_active = True
+        except Exception:
+            pass
+
+    def _auto_resize_chat(self):
+        """Adjust modal height based on chat content up to a max, to keep UI compact."""
+        try:
+            # Prefer precise pixel count for full content height
+            total_pixels = 0
+            try:
+                total_pixels = int(self.chat_text.count("1.0", "end", "ypixels")[0])
+            except Exception:
+                # Fallback to last line metrics if count unsupported
+                info = self.chat_text.dlineinfo("end-1c")
+                if not info:
+                    return
+                _, y, _, h, _, _ = info
+                total_pixels = y + h + 6
+            current_height = self.modal_window.winfo_height()
+            extra = max(total_pixels, self._min_chat_extra_px)
+            target_extra = min(extra, self._max_chat_extra_px)
+            target_height = self._base_modal_height + target_extra
+            if abs(current_height - target_height) > 4:
+                self.modal_window.after_idle(lambda: self.modal_window.wm_geometry(f"{self.modal_width}x{target_height}"))
+        except Exception:
+            pass
+
+    def _resize_to_content(self):
+        """Public helper to trigger content-based resize after UI settles (visual only)."""
+        try:
+            # Allow geometry to stabilize, then compute and apply target height
+            self.modal_window.after(10, self._auto_resize_chat)
+        except Exception:
+            pass
