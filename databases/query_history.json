@@ -278,5 +278,117 @@
     "status": "success",
     "database": "company",
     "id": 40
+  },
+  {
+    "query": "select * from Deparments",
+    "timestamp": "2025-10-31T03:14:10.383901",
+    "status": "error: no such table: Deparments",
+    "database": "company",
+    "id": 41
+  },
+  {
+    "query": "select * from Deparments;",
+    "timestamp": "2025-10-31T03:14:10.391169",
+    "status": "success",
+    "database": "company",
+    "id": 42
+  },
+  {
+    "query": "select * from Departments",
+    "timestamp": "2025-10-31T03:14:21.124591",
+    "status": "success",
+    "database": "company",
+    "id": 43
+  },
+  {
+    "query": "select * from Departments;",
+    "timestamp": "2025-10-31T03:14:21.133024",
+    "status": "success",
+    "database": "company",
+    "id": 44
+  },
+  {
+    "query": "CREATE OR REPLACE VIEW public.active_users AS SELECT id, name, email, created_at FROM public.users WHERE is_active = true ORDER BY created_at DESC; COMMENT ON VIEW public.active_users IS 'Shows only active user accounts'",
+    "timestamp": "2025-10-31T03:18:11.671253",
+    "status": "success",
+    "database": "ascds",
+    "id": 45
+  },
+  {
+    "query": "-- Current Database: ascds\n-- Ready to execute SQL queries\n\n-- CREATE VIEW: Displays active users (example)\nCREATE OR REPLACE VIEW public.active_users AS\nSELECT \n    id,\n    name,\n    email,\n    created_at\nFROM public.users\nWHERE is_active = true\nORDER BY created_at DESC;\n\n-- Optional: Add comment\nCOMMENT ON VIEW public.active_users IS 'Shows only active user accounts';",
+    "timestamp": "2025-10-31T03:18:11.678353",
+    "status": "success",
+    "database": "ascds",
+    "id": 46
+  },
+  {
+    "query": "CREATE OR REPLACE VIEW public.active_users AS SELECT id, name, email, created_at FROM public.users WHERE is_active = true ORDER BY created_at DESC; COMMENT ON VIEW public.active_users IS 'Shows only active user accounts'",
+    "timestamp": "2025-10-31T03:18:46.940641",
+    "status": "success",
+    "database": "ascds",
+    "id": 47
+  },
+  {
+    "query": "-- Current Database: ascds\n-- Ready to execute SQL queries\n\n-- CREATE VIEW: Displays active users (example)\nCREATE OR REPLACE VIEW public.active_users AS\nSELECT \n    id,\n    name,\n    email,\n    created_at\nFROM public.users\nWHERE is_active = true\nORDER BY created_at DESC;\n\n-- Optional: Add comment\nCOMMENT ON VIEW public.active_users IS 'Shows only active user accounts';",
+    "timestamp": "2025-10-31T03:18:46.945882",
+    "status": "success",
+    "database": "ascds",
+    "id": 48
+  },
+  {
+    "query": "CREATE OR REPLACE VIEW public.active_users AS SELECT id, name, email, created_at FROM public.users WHERE is_active = true ORDER BY created_at DESC; COMMENT ON VIEW public.active_users IS 'Shows only active user accounts'",
+    "timestamp": "2025-10-31T03:21:47.871153",
+    "status": "success",
+    "database": "ascds",
+    "id": 49
+  },
+  {
+    "query": "-- CREATE VIEW: Displays active users (example)\nCREATE OR REPLACE VIEW public.active_users AS\nSELECT \n    id,\n    name,\n    email,\n    created_at\nFROM public.users\nWHERE is_active = true\nORDER BY created_at DESC;\n\n-- Optional: Add comment\nCOMMENT ON VIEW public.active_users IS 'Shows only active user accounts';",
+    "timestamp": "2025-10-31T03:21:47.877758",
+    "status": "success",
+    "database": "ascds",
+    "id": 50
+  },
+  {
+    "query": "CREATE OR REPLACE VIEW public.active_users AS SELECT id, name, email, created_at FROM public.users WHERE is_active = true ORDER BY created_at DESC; COMMENT ON VIEW public.active_users IS 'Shows only active user accounts'",
+    "timestamp": "2025-10-31T03:22:10.726048",
+    "status": "success",
+    "database": "ascds",
+    "id": 51
+  },
+  {
+    "query": "-- Current Database: ascds\n-- Ready to execute SQL queries\n\n-- CREATE VIEW: Displays active users (example)\nCREATE OR REPLACE VIEW public.active_users AS\nSELECT \n    id,\n    name,\n    email,\n    created_at\nFROM public.users\nWHERE is_active = true\nORDER BY created_at DESC;\n\n-- Optional: Add comment\nCOMMENT ON VIEW public.active_users IS 'Shows only active user accounts';",
+    "timestamp": "2025-10-31T03:22:10.738201",
+    "status": "success",
+    "database": "ascds",
+    "id": 52
+  },
+  {
+    "query": "DROP VIEW IF EXISTS active_users; CREATE VIEW active_users AS SELECT id, name, email, created_at FROM users WHERE is_active = true ORDER BY created_at DESC; COMMENT ON VIEW active_users IS 'Shows only active user accounts'",
+    "timestamp": "2025-10-31T03:24:45.319707",
+    "status": "success",
+    "database": "ascds",
+    "id": 53
+  },
+  {
+    "query": "-- Current Database: ascds\n-- Ready to execute SQL queries\n\n-- CREATE VIEW: Displays active users (example)\nCREATE OR REPLACE VIEW public.active_users AS\nSELECT \n    id,\n    name,\n    email,\n    created_at\nFROM public.users\nWHERE is_active = true\nORDER BY created_at DESC;\n\n-- Optional: Add comment\nCOMMENT ON VIEW public.active_users IS 'Shows only active user accounts';",
+    "timestamp": "2025-10-31T03:24:45.326498",
+    "status": "success",
+    "database": "ascds",
+    "id": 54
+  },
+  {
+    "query": "CREATE OR REPLACE TRIGGER trg_update_timestamp BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.update_timestamp_column(); CREATE OR REPLACE FUNCTION public.update_timestamp_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = datetime(\"now\")(); RETURN NEW; END; $$ LANGUAGE plpgsql",
+    "timestamp": "2025-10-31T03:24:59.272245",
+    "status": "success",
+    "database": "ascds",
+    "id": 55
+  },
+  {
+    "query": "-- Current Database: ascds\n-- Ready to execute SQL queries\n-- CREATE TRIGGER: Auto-update updated_at timestamp\nCREATE OR REPLACE TRIGGER trg_update_timestamp\nBEFORE UPDATE ON public.users\nFOR EACH ROW\nEXECUTE FUNCTION public.update_timestamp_column();\n\n-- Supporting function for trigger\nCREATE OR REPLACE FUNCTION public.update_timestamp_column()\nRETURNS TRIGGER AS $$\nBEGIN\n    NEW.updated_at = NOW();\n    RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;",
+    "timestamp": "2025-10-31T03:24:59.277527",
+    "status": "success",
+    "database": "ascds",
+    "id": 56
   }
 ]

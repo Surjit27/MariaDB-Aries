@@ -96,7 +96,20 @@ class SimpleSQLCompiler:
         sql_upper = sql.upper().strip()
         
         try:
-            if sql_upper.startswith('CREATE TABLE'):
+            # Handle COMMENT ON statements (SQLite doesn't support - ignore them)
+            if sql_upper.startswith('COMMENT ON'):
+                return ''  # Return empty string to skip execution
+            
+            # Handle CREATE OR REPLACE statements
+            if sql_upper.startswith('CREATE OR REPLACE VIEW'):
+                return self._compile_create_or_replace_view(sql)
+            elif sql_upper.startswith('CREATE OR REPLACE TRIGGER'):
+                return self._compile_create_or_replace_trigger(sql)
+            elif sql_upper.startswith('CREATE OR REPLACE FUNCTION'):
+                return self._compile_create_or_replace_function(sql)
+            elif sql_upper.startswith('CREATE OR REPLACE INDEX'):
+                return self._compile_create_or_replace_index(sql)
+            elif sql_upper.startswith('CREATE TABLE'):
                 return self._compile_create_table(sql)
             elif sql_upper.startswith('CREATE INDEX'):
                 return self._compile_create_index(sql)
@@ -387,24 +400,160 @@ class SimpleSQLCompiler:
             return f"CHECK ({condition})"
         return constraint
     
+    def _compile_create_or_replace_index(self, sql: str) -> str:
+        """Compile CREATE OR REPLACE INDEX to SQLite syntax (DROP INDEX IF EXISTS then CREATE INDEX)."""
+        import re
+        
+        # Extract index name (handle public.schema format and UNIQUE keyword)
+        index_match = re.search(r'CREATE\s+OR\s+REPLACE\s+(?:UNIQUE\s+)?INDEX\s+(?:public\.)?(\w+)', sql, re.IGNORECASE)
+        if not index_match:
+            return sql
+        
+        index_name = index_match.group(1)
+        
+        # Check if UNIQUE
+        is_unique = 'UNIQUE' in sql.upper()
+        
+        # Extract the rest of the statement (everything after index name)
+        rest_match = re.search(r'CREATE\s+OR\s+REPLACE\s+(?:UNIQUE\s+)?INDEX\s+(?:public\.)?\w+\s+(.*)$', sql, re.IGNORECASE | re.DOTALL)
+        if not rest_match:
+            return sql
+        
+        rest_part = rest_match.group(1).strip()
+        
+        # Remove public. prefixes from table names
+        rest_part = re.sub(r'\bON\s+public\.(\w+)', r'ON \1', rest_part, flags=re.IGNORECASE)
+        
+        # Remove trailing semicolon if present
+        rest_part = rest_part.rstrip(';').strip()
+        
+        # Create SQLite-compatible statements: DROP INDEX IF EXISTS then CREATE INDEX
+        drop_statement = f"DROP INDEX IF EXISTS {index_name};"
+        unique_keyword = "UNIQUE " if is_unique else ""
+        create_statement = f"CREATE {unique_keyword}INDEX {index_name} {rest_part}"
+        
+        return f"{drop_statement}\n{create_statement}"
+    
     def _compile_create_index(self, sql: str) -> str:
         """Compile CREATE INDEX statement."""
+        import re
+        # Remove public. schema prefix from index name
+        sql = re.sub(r'CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:public\.)?', lambda m: m.group(0).replace('public.', ''), sql, flags=re.IGNORECASE)
+        # Remove public. prefixes from table names
+        sql = re.sub(r'\bON\s+public\.(\w+)', r'ON \1', sql, flags=re.IGNORECASE)
         return self._apply_basic_transformations(sql)
+    
+    def _compile_create_or_replace_view(self, sql: str) -> str:
+        """Compile CREATE OR REPLACE VIEW to SQLite syntax (DROP VIEW IF EXISTS then CREATE VIEW)."""
+        import re
+        
+        # Extract view name (handle public.schema format)
+        view_match = re.search(r'CREATE\s+OR\s+REPLACE\s+VIEW\s+(?:public\.)?(\w+)', sql, re.IGNORECASE)
+        if not view_match:
+            return sql
+        
+        view_name = view_match.group(1)
+        
+        # Extract the SELECT part (everything after AS)
+        as_match = re.search(r'\bAS\s+(.*)$', sql, re.IGNORECASE | re.DOTALL)
+        if not as_match:
+            return sql
+        
+        select_part = as_match.group(1).strip()
+        
+        # Remove public. prefixes from table names in SELECT
+        select_part = re.sub(r'\bpublic\.(\w+)', r'\1', select_part, flags=re.IGNORECASE)
+        
+        # Remove trailing semicolon if present
+        select_part = select_part.rstrip(';').strip()
+        
+        # Create SQLite-compatible statements: DROP VIEW IF EXISTS then CREATE VIEW
+        drop_statement = f"DROP VIEW IF EXISTS {view_name};"
+        create_statement = f"CREATE VIEW {view_name} AS {select_part}"
+        
+        return f"{drop_statement}\n{create_statement}"
     
     def _compile_create_view(self, sql: str) -> str:
         """Compile CREATE VIEW statement."""
+        import re
+        
+        # Remove public. schema prefix from view name
+        sql = re.sub(r'CREATE\s+VIEW\s+(?:public\.)?', 'CREATE VIEW ', sql, flags=re.IGNORECASE)
+        
+        # Remove public. prefixes from table names in SELECT
+        sql = re.sub(r'\bpublic\.(\w+)', r'\1', sql, flags=re.IGNORECASE)
+        
         return self._apply_basic_transformations(sql)
+    
+    def _compile_create_or_replace_trigger(self, sql: str) -> str:
+        """Compile CREATE OR REPLACE TRIGGER to SQLite syntax (DROP TRIGGER IF EXISTS then CREATE TRIGGER)."""
+        import re
+        
+        # Extract trigger name (handle public.schema format)
+        trigger_match = re.search(r'CREATE\s+OR\s+REPLACE\s+TRIGGER\s+(?:public\.)?(\w+)', sql, re.IGNORECASE)
+        if not trigger_match:
+            return sql
+        
+        trigger_name = trigger_match.group(1)
+        
+        # Extract the rest of the statement (everything after trigger name)
+        rest_match = re.search(r'CREATE\s+OR\s+REPLACE\s+TRIGGER\s+(?:public\.)?\w+\s+(.*)$', sql, re.IGNORECASE | re.DOTALL)
+        if not rest_match:
+            return sql
+        
+        rest_part = rest_match.group(1).strip()
+        
+        # Remove public. prefixes from table names
+        rest_part = re.sub(r'\bON\s+public\.(\w+)', r'ON \1', rest_part, flags=re.IGNORECASE)
+        
+        # Remove trailing semicolon if present
+        rest_part = rest_part.rstrip(';').strip()
+        
+        # Create SQLite-compatible statements: DROP TRIGGER IF EXISTS then CREATE TRIGGER
+        drop_statement = f"DROP TRIGGER IF EXISTS {trigger_name};"
+        create_statement = f"CREATE TRIGGER {trigger_name} {rest_part}"
+        
+        return f"{drop_statement}\n{create_statement}"
     
     def _compile_create_trigger(self, sql: str) -> str:
         """Compile CREATE TRIGGER statement."""
+        import re
+        # Remove public. schema prefix from trigger name
+        sql = re.sub(r'CREATE\s+TRIGGER\s+(?:public\.)?', 'CREATE TRIGGER ', sql, flags=re.IGNORECASE)
+        # Remove public. prefixes from table names
+        sql = re.sub(r'\bON\s+public\.(\w+)', r'ON \1', sql, flags=re.IGNORECASE)
         return self._apply_basic_transformations(sql)
+    
+    def _compile_create_or_replace_function(self, sql: str) -> str:
+        """Compile CREATE OR REPLACE FUNCTION to SQLite syntax (DROP FUNCTION IF EXISTS then CREATE FUNCTION)."""
+        import re
+        
+        # Extract function name (handle public.schema format)
+        func_match = re.search(r'CREATE\s+OR\s+REPLACE\s+FUNCTION\s+(?:public\.)?(\w+)', sql, re.IGNORECASE)
+        if not func_match:
+            return sql
+        
+        func_name = func_match.group(1)
+        
+        # For SQLite, functions are usually not stored - return a comment
+        # But we'll compile it anyway in case the user wants to track it
+        drop_statement = f"-- DROP FUNCTION IF EXISTS {func_name}; -- Not supported in SQLite"
+        create_statement = f"-- {sql.replace('CREATE OR REPLACE FUNCTION', 'CREATE FUNCTION').replace('CREATE OR REPLACE', 'CREATE')}"
+        
+        return f"{drop_statement}\n{create_statement}"
     
     def _compile_create_function(self, sql: str) -> str:
         """Compile CREATE FUNCTION statement."""
+        import re
+        # Remove public. schema prefix from function name
+        sql = re.sub(r'CREATE\s+FUNCTION\s+(?:public\.)?', 'CREATE FUNCTION ', sql, flags=re.IGNORECASE)
         return self._apply_basic_transformations(sql)
     
     def _compile_create_procedure(self, sql: str) -> str:
         """Compile CREATE PROCEDURE statement."""
+        import re
+        # Remove public. schema prefix from procedure name
+        sql = re.sub(r'CREATE\s+PROCEDURE\s+(?:public\.)?', 'CREATE PROCEDURE ', sql, flags=re.IGNORECASE)
         return self._apply_basic_transformations(sql)
     
     def _compile_create_database(self, sql: str) -> str:
@@ -472,6 +621,8 @@ class SimpleSQLCompiler:
     
     def _apply_basic_transformations(self, sql: str) -> str:
         """Apply basic SQL transformations."""
+        import re
+        
         # Replace LIMIT OFFSET syntax
         sql = re.sub(r'\bLIMIT\s+(\d+)\s+OFFSET\s+(\d+)\b', r'LIMIT \2, \1', sql, flags=re.IGNORECASE)
         
@@ -485,6 +636,11 @@ class SimpleSQLCompiler:
         # Replace data types in function parameters
         for old_type, new_type in self.data_type_mappings.items():
             sql = re.sub(rf'\b{old_type}\s*\(\d+\)', new_type, sql, flags=re.IGNORECASE)
+        
+        # Replace boolean true/false with SQLite-compatible 1/0
+        # Use word boundaries to avoid replacing in strings/names
+        sql = re.sub(r'\btrue\b', '1', sql, flags=re.IGNORECASE)
+        sql = re.sub(r'\bfalse\b', '0', sql, flags=re.IGNORECASE)
         
         return sql
     

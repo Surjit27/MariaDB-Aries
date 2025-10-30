@@ -657,6 +657,15 @@ class EnhancedSQLEditor:
                     
                     self.status_label.configure(text="Query executed successfully")
                     
+                    # Refresh sidebar if CREATE/ALTER/DROP operations were performed
+                    query_upper = query.upper().strip()
+                    if any(query_upper.startswith(cmd) for cmd in ["CREATE", "ALTER", "DROP"]):
+                        if hasattr(self, 'sidebar') and self.sidebar:
+                            try:
+                                self.sidebar.refresh_all_panels()
+                            except:
+                                pass
+                    
                     # Add to query history
                     if hasattr(self.db_manager, 'add_to_history'):
                         self.db_manager.add_to_history(query, "success")

@@ -117,6 +117,14 @@ class EnhancedDatabaseManager:
             print(f"Original query: {statements[0]}")
             print(f"Compiled query: {compiled_query}")
             
+            # Skip if compiled query is empty (e.g., COMMENT ON statements)
+            if not compiled_query or not compiled_query.strip():
+                return [], [], None
+            
+            # If compiled query contains multiple statements (e.g., DROP VIEW IF EXISTS; CREATE VIEW)
+            if ';' in compiled_query:
+                return self._execute_multiple_statements(self._split_sql_statements(compiled_query))
+            
             # Execute query
             self.cursor.execute(compiled_query, params)
             
@@ -129,6 +137,12 @@ class EnhancedDatabaseManager:
                 return column_names, results, None
             else:
                 self.connection.commit()
+                # Reload schema after CREATE/ALTER/DROP statements to update UI
+                if any(query_upper.startswith(cmd) for cmd in ["CREATE", "ALTER", "DROP"]):
+                    try:
+                        self.load_database_schema()
+                    except:
+                        pass
                 return [], [], None
                 
         except sqlite3.Error as e:
@@ -159,6 +173,10 @@ class EnhancedDatabaseManager:
                     compiled_query = self.sql_compiler.compile_sql(statement)
                     print(f"Compiled: {compiled_query[:100]}...")
                     
+                    # Skip if compiled query is empty (e.g., COMMENT ON statements)
+                    if not compiled_query or not compiled_query.strip():
+                        continue
+                    
                     # Execute query
                     self.cursor.execute(compiled_query)
                     executed_count += 1
@@ -176,6 +194,13 @@ class EnhancedDatabaseManager:
             
             # Commit all changes
             self.connection.commit()
+            
+            # Reload schema if any CREATE/ALTER/DROP statements were executed
+            if any(stmt.strip().upper().startswith(("CREATE", "ALTER", "DROP")) for stmt in statements):
+                try:
+                    self.load_database_schema()
+                except:
+                    pass
             
             # Add to history
             self.add_to_history("; ".join(statements), "success")
@@ -486,10 +511,139 @@ class EnhancedDatabaseManager:
         if not self.connection or not self.cursor:
             return []
         try:
-            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
             return [row[0] for row in self.cursor.fetchall()]
         except sqlite3.Error as e:
             print(f"Error fetching tables: {e}")
+            return []
+    
+    def get_views(self) -> List[str]:
+        """Get list of views in current database."""
+        if not self.connection or not self.cursor:
+            return []
+        try:
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='view'")
+            return [row[0] for row in self.cursor.fetchall()]
+        except sqlite3.Error as e:
+            print(f"Error fetching views: {e}")
+            return []
+    
+    def get_triggers(self) -> List[str]:
+        """Get list of triggers in current database."""
+        if not self.connection or not self.cursor:
+            return []
+        try:
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='trigger'")
+            return [row[0] for row in self.cursor.fetchall()]
+        except sqlite3.Error as e:
+            print(f"Error fetching triggers: {e}")
+            return []
+    
+    def get_indexes(self, table_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get list of indexes in current database. Optionally filter by table."""
+        if not self.connection or not self.cursor:
+            return []
+        try:
+            if table_name:
+                self.cursor.execute("SELECT name, tbl_name FROM sqlite_master WHERE type='index' AND tbl_name=? AND name NOT LIKE 'sqlite_%'", (table_name,))
+            else:
+                self.cursor.execute("SELECT name, tbl_name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'")
+            return [{"name": row[0], "table": row[1]} for row in self.cursor.fetchall()]
+        except sqlite3.Error as e:
+            print(f"Error fetching indexes: {e}")
+            return []
+    
+    def get_constraints(self, table_name: str) -> List[Dict[str, Any]]:
+        """Get constraints (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK) for a table."""
+        if not self.connection or not self.cursor:
+            return []
+        try:
+            # Get PRAGMA table_info for column constraints
+            self.cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = self.cursor.fetchall()
+            constraints = []
+            
+            for col in columns:
+                col_name, col_type, not_null, default_val, pk = col[0], col[1], col[2], col[3], col[4]
+                
+                # Primary key
+                if pk:
+                    constraints.append({"name": f"PK_{table_name}_{col_name}", "type": "PRIMARY KEY", "column": col_name})
+                
+                # Not null constraint
+                if not_null:
+                    constraints.append({"name": f"NN_{table_name}_{col_name}", "type": "NOT NULL", "column": col_name})
+                
+                # Default constraint
+                if default_val is not None:
+                    constraints.append({"name": f"DF_{table_name}_{col_name}", "type": "DEFAULT", "column": col_name, "default": default_val})
+            
+            # Get foreign keys
+            self.cursor.execute(f"PRAGMA foreign_key_list({table_name})")
+            fks = self.cursor.fetchall()
+            for fk in fks:
+                constraints.append({"name": fk[0] or f"FK_{table_name}_{fk[3]}", "type": "FOREIGN KEY", "column": fk[3], "references": f"{fk[2]}.{fk[4]}"})
+            
+            return constraints
+        except sqlite3.Error as e:
+            print(f"Error fetching constraints: {e}")
+            return []
+    
+    def get_functions(self) -> List[str]:
+        """Get list of functions. SQLite doesn't support stored functions, but we can track user-defined ones."""
+        # SQLite doesn't have stored procedures/functions like PostgreSQL
+        # But we can check if there are any custom functions registered
+        # For now, return empty or check for application-defined functions
+        return []
+    
+    def get_procedures(self) -> List[str]:
+        """Get list of procedures. SQLite doesn't support stored procedures."""
+        # SQLite doesn't support stored procedures
+        # But we can track application-level procedures if needed
+        return []
+    
+    def get_columns(self, table_name: str) -> List[Dict[str, Any]]:
+        """Get columns for a table with their properties (type, PK, FK, not null, default)."""
+        if not self.connection or not self.cursor:
+            return []
+        try:
+            # Get column info
+            self.cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = self.cursor.fetchall()
+            
+            # Get foreign keys
+            self.cursor.execute(f"PRAGMA foreign_key_list({table_name})")
+            fks_raw = self.cursor.fetchall()
+            # Create a map: column_name -> foreign key info
+            fk_map = {}
+            for fk in fks_raw:
+                col_name = fk[3] if len(fk) > 3 else None
+                if col_name:
+                    fk_map[col_name] = {"table": fk[2] if len(fk) > 2 else None, "column": fk[4] if len(fk) > 4 else None}
+            
+            # Build column list with metadata
+            result = []
+            for col in columns:
+                col_id, col_name, col_type, not_null, default_val, pk = col[0], col[1], col[2], col[3], col[4], col[5]
+                
+                col_info = {
+                    "name": col_name,
+                    "type": col_type,
+                    "pk": bool(pk),
+                    "fk": col_name in fk_map,
+                    "not_null": bool(not_null),
+                    "default": default_val
+                }
+                
+                # Add FK details if present
+                if col_name in fk_map:
+                    col_info["fk_ref"] = fk_map[col_name]
+                
+                result.append(col_info)
+            
+            return result
+        except sqlite3.Error as e:
+            print(f"Error fetching columns: {e}")
             return []
 
     def get_table_data(self, table_name: str, limit: int = 100) -> Tuple[List[str], List[Any]]:

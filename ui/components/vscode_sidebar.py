@@ -2,6 +2,7 @@ import tkinter as tk
 import ttkbootstrap as ttk
 from ui.components.modern_theme import ModernTheme
 import os
+from tkinter import messagebox
 
 class VSCodeSidebar:
     def __init__(self, parent, db_manager, ai_integration):
@@ -9,169 +10,254 @@ class VSCodeSidebar:
         self.db_manager = db_manager
         self.ai_integration = ai_integration
         self.theme = ModernTheme()
-        self.icons = self.theme.get_emoji_icons()
         self.is_collapsed = False
-        self.section_states = {
-            'databases': True,
-            'functions': True,
-            'views': True,
-            'triggers': True,
-            'procedures': True
-        }
+        # Tabs: DB, TRIGGER, VIEW, FUNCTION, INDEX, PROCEDURE
+        self.tabs = [
+            {"key": "dbafdcaf", "icon": "🗄️", "label": "DB"},
+            {"key": "trigger", "icon": "⚡", "label": "TRIGGER"},
+            {"key": "view", "icon": "👁️", "label": "VIEW"},
+            {"key": "function", "icon": "ƒ", "label": "FUNCTION"},
+            {"key": "index", "icon": "🔍", "label": "INDEX"},
+            {"key": "procedure", "icon": "⚙️", "label": "PROCEDURE"},
+        ]
+        self.active_tab_key = None
+        self.panel_frames = {}
         self.create_widgets()
         
     def create_widgets(self):
-        """Create the VS Code-style sidebar."""
+        """Create the horizontal-tab style sidebar with full-area panels."""
         # Main sidebar frame
-        self.sidebar_frame = ttk.Frame(self.parent, style="SideNav.TFrame", width=280)
+        self.sidebar_frame = ttk.Frame(self.parent, style="SideNav.TFrame", width=300)
         self.sidebar_frame.pack(side=tk.LEFT, fill=tk.Y, padx=0, pady=0)
         self.sidebar_frame.pack_propagate(False)
         
-        # Sidebar header
-        self.create_header()
-        
-        # Main content area with scrollbar
-        self.create_content_area()
+        # Top horizontal icon-only tab bar
+        self.create_tab_bar()
+
+        # Content container (fills the rest)
+        self.content_container = ttk.Frame(self.sidebar_frame, style="SideNav.TFrame")
+        self.content_container.pack(fill="both", expand=True, padx=6, pady=6)
+
+        # Default empty state
+        self.empty_state = ttk.Frame(self.content_container, style="SideNav.TFrame")
+        self.empty_state.pack(fill="both", expand=True)
+        empty_label = ttk.Label(
+            self.empty_state,
+            text="Select a tab",
+            font=("Segoe UI", 11, "bold"),
+            foreground="#1a1a1a"
+        )
+        empty_label.pack(expand=True)
         
         # Collapse/expand button
         self.create_collapse_button()
         
-    def create_header(self):
-        """Create the sidebar header."""
-        header_frame = ttk.Frame(self.sidebar_frame, style="SideNav.TFrame")
-        header_frame.pack(fill=tk.X, padx=8, pady=8)
-        
-        # Title with VS Code styling
-        title_label = ttk.Label(header_frame, text="EXPLORER", 
-                               style="Title.TLabel", font=("Consolas", 11, "bold"))
-        title_label.pack(anchor=tk.W)
-        
-        # Separator
-        ttk.Separator(header_frame, orient=tk.HORIZONTAL, style="Modern.TSeparator").pack(fill=tk.X, pady=4)
+    def create_tab_bar(self):
+        """Create the horizontal emoji tab bar."""
+        tabbar = ttk.Frame(self.sidebar_frame, style="SideNav.TFrame")
+        tabbar.pack(fill=tk.X, padx=8, pady=8)
+
+        self._tab_buttons = {}
+
+        for tab in self.tabs:
+            btn = tk.Label(
+                tabbar,
+                text=tab["icon"],
+                bg="#ffffff",  # white background
+                fg="#333333",
+                bd=0,
+                font=("Segoe UI Emoji", 14, "normal"),
+                width=2,
+                height=1,
+                relief="flat",
+            )
+            btn.pack(side=tk.LEFT, padx=6)
+            btn.bind("<Button-1>", lambda e, key=tab["key"]: self.switch_tab(key))
+            btn.bind("<Enter>", lambda e, b=btn: b.config(fg="#0066CC"))
+            btn.bind("<Leave>", lambda e, b=btn: b.config(fg="#333333" if b.cget("bg") == "#ffffff" else "#ffffff"))
+            self._tab_buttons[tab["key"]] = btn
+
+    def _update_active_tab_styles(self):
+        for key, btn in self._tab_buttons.items():
+            if key == self.active_tab_key:
+                btn.config(bg="#FFA500", fg="#000000", font=("Segoe UI Emoji", 14, "bold"))
+            else:
+                btn.config(bg="#ffffff", fg="#333333", font=("Segoe UI Emoji", 14, "normal"))
     
-    def create_content_area(self):
-        """Create the main content area with scrollbar."""
-        # Create a simple frame without canvas for better performance
-        self.content_frame = ttk.Frame(self.sidebar_frame, style="SideNav.TFrame")
-        self.content_frame.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        # Create VS Code-style sections
-        self.create_vscode_sections()
-    
-    def _on_mousewheel(self, event):
-        """Handle mousewheel scrolling."""
-        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-    
-    def create_vscode_sections(self):
-        """Create VS Code-style collapsible sections."""
-        # Databases section
-        self.create_vscode_section("databases", "🗄️", "DATABASES", self.create_database, self.refresh_databases)
-        
-        # Functions section
-        self.create_vscode_section("functions", "🧩", "FUNCTIONS", self.create_function, self.refresh_functions)
-        
-        # Views section
-        self.create_vscode_section("views", "👁️", "VIEWS", self.create_view, self.refresh_views)
-        
-        # Triggers section
-        self.create_vscode_section("triggers", "🧨", "TRIGGERS", self.create_trigger, self.refresh_triggers)
-        
-        # Procedures section
-        self.create_vscode_section("procedures", "⚙️", "PROCEDURES", self.create_procedure, self.refresh_procedures)
-        
-        # Initialize with databases expanded and populated
-        self.refresh_databases()
-    
-    def create_vscode_section(self, section_name, icon, title, create_cmd, refresh_cmd):
-        """Create a VS Code-style collapsible section."""
-        # Section header with VS Code-style look
-        header_frame = ttk.Frame(self.content_frame, style="SideNav.TFrame")
-        header_frame.pack(fill=tk.X, padx=0, pady=2)
-        
-        # Toggle button (chevron) - VS Code style
-        toggle_btn = tk.Button(header_frame, text="▼" if self.section_states[section_name] else "▶",
-                              command=lambda: self.toggle_section(section_name),
-                              bg="#1e1e1e", fg="#cccccc", bd=0, 
-                              font=("Consolas", 10), width=2, height=1,
-                              activebackground="#2d2d2d", activeforeground="#ffffff")
-        toggle_btn.pack(side=tk.LEFT, padx=2, pady=2)
-        
-        # Section title (clickable) - VS Code style
-        title_btn = tk.Button(header_frame, text=f"{icon} {title}",
-                              command=lambda: self.toggle_section(section_name),
-                              bg="#1e1e1e", fg="#cccccc", bd=0,
-                              font=("Consolas", 10), anchor="w",
-                              activebackground="#2d2d2d", activeforeground="#ffffff")
-        title_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2, pady=2)
-        
-        # Action buttons (VS Code style)
-        actions_frame = ttk.Frame(header_frame, style="SideNav.TFrame")
-        actions_frame.pack(side=tk.RIGHT, padx=2)
-        
-        create_btn = tk.Button(actions_frame, text="+", command=create_cmd,
-                              bg="#1e1e1e", fg="#cccccc", bd=0,
-                              font=("Consolas", 10), width=2, height=1,
-                              activebackground="#2d2d2d", activeforeground="#ffffff")
-        create_btn.pack(side=tk.LEFT, padx=1)
-        
-        refresh_btn = tk.Button(actions_frame, text="↻", command=refresh_cmd,
-                               bg="#1e1e1e", fg="#cccccc", bd=0,
-                               font=("Consolas", 10), width=2, height=1,
-                               activebackground="#2d2d2d", activeforeground="#ffffff")
-        refresh_btn.pack(side=tk.LEFT, padx=1)
-        
-        # Content area (initially hidden)
-        content_frame = ttk.Frame(self.content_frame, style="SideNav.TFrame")
-        if self.section_states[section_name]:
-            content_frame.pack(fill=tk.X, padx=20, pady=0)
-        
-        # Store references
-        setattr(self, f"{section_name}_header", header_frame)
-        setattr(self, f"{section_name}_content", content_frame)
-        setattr(self, f"{section_name}_toggle", toggle_btn)
-        
-        # Create treeview for content with VS Code styling
-        tree = ttk.Treeview(content_frame, show="tree", height=3)
-        tree.pack(fill=tk.X, padx=5, pady=5)
-        
-        # Configure treeview to look like VS Code
-        style = ttk.Style()
-        style.configure("Treeview", background="#1e1e1e", foreground="#cccccc", 
-                       fieldbackground="#1e1e1e", borderwidth=0)
-        style.configure("Treeview.Item", padding=(2, 2))
-        style.map("Treeview", background=[("selected", "#2d2d2d")])
-        
-        setattr(self, f"{section_name}_tree", tree)
-        
-        # Initially hide content if section is collapsed
-        if not self.section_states[section_name]:
-            content_frame.pack_forget()
-    
-    def toggle_section(self, section_name):
-        """Toggle section expand/collapse state."""
-        self.section_states[section_name] = not self.section_states[section_name]
-        content_frame = getattr(self, f"{section_name}_content")
-        toggle_btn = getattr(self, f"{section_name}_toggle")
-        
-        if self.section_states[section_name]:
-            # Expand section
-            content_frame.pack(fill=tk.X, padx=20, pady=0)
-            toggle_btn.configure(text="▼")
-            # Refresh content when expanding
-            if section_name == "databases":
-                self.refresh_databases()
-            elif section_name == "functions":
-                self.refresh_functions()
-            elif section_name == "views":
-                self.refresh_views()
-            elif section_name == "triggers":
-                self.refresh_triggers()
-            elif section_name == "procedures":
-                self.refresh_procedures()
+    def switch_tab(self, tab_key):
+        """Switch to the selected tab, rendering its panel full-area."""
+        if tab_key == self.active_tab_key:
+            return
+
+        # Clear current content
+        for child in self.content_container.winfo_children():
+            child.pack_forget()
+
+        self.active_tab_key = tab_key
+        self._update_active_tab_styles()
+
+        if tab_key not in self.panel_frames:
+            if tab_key == "db":
+                self.panel_frames[tab_key] = self._create_db_panel(self.content_container)
+            elif tab_key == "trigger":
+                self.panel_frames[tab_key] = self._create_list_panel(self.content_container, "Triggers")
+            elif tab_key == "view":
+                self.panel_frames[tab_key] = self._create_list_panel(self.content_container, "Views")
+            elif tab_key == "function":
+                self.panel_frames[tab_key] = self._create_list_panel(self.content_container, "Functions")
+            elif tab_key == "index":
+                self.panel_frames[tab_key] = self._create_list_panel(self.content_container, "Indexes")
+            elif tab_key == "procedure":
+                self.panel_frames[tab_key] = self._create_list_panel(self.content_container, "Procedures")
+
+        panel = self.panel_frames.get(tab_key)
+        if panel is not None:
+            panel.pack(fill="both", expand=True)
         else:
-            # Collapse section
-            content_frame.pack_forget()
-            toggle_btn.configure(text="▶")
+            # Fallback to empty state
+            self.empty_state.pack(fill="both", expand=True)
+    
+    def _create_search_bar(self, parent, placeholder="Search..."):
+        wrapper = ttk.Frame(parent)
+        wrapper.pack(fill=tk.X, pady=4)
+        entry = ttk.Entry(wrapper)
+        entry.insert(0, placeholder)
+        def _on_focus_in(_):
+            if entry.get() == placeholder:
+                entry.delete(0, tk.END)
+        def _on_focus_out(_):
+            if not entry.get():
+                entry.insert(0, placeholder)
+        entry.bind("<FocusIn>", _on_focus_in)
+        entry.bind("<FocusOut>", _on_focus_out)
+        entry.pack(fill=tk.X)
+        return entry
+    
+    def _create_db_panel(self, parent):
+        panel = ttk.Frame(parent, style="SideNav.TFrame")
+
+        # Search bar
+        search = self._create_search_bar(panel, "Search…")
+
+        # Tree area + optional data preview split
+        split = ttk.PanedWindow(panel, orient=tk.VERTICAL)
+        split.pack(fill=tk.BOTH, expand=True)
+
+        tree_frame = ttk.Frame(split, style="SideNav.TFrame")
+        preview_frame = ttk.Frame(split, style="SideNav.TFrame")
+
+        # TreeView
+        columns = ("type", "details")
+        tree = ttk.Treeview(tree_frame, show="tree", selectmode="browse")
+        tree.pack(fill=tk.BOTH, expand=True)
+
+        self.db_tree = tree
+        self.db_preview = preview_frame
+        self.db_search_entry = search
+
+        # Bindings
+        tree.bind("<Double-1>", self._on_db_tree_double_click)
+        tree.bind("<Button-3>", self._on_db_tree_right_click)
+        search.bind("<KeyRelease>", self._on_db_search_change)
+
+        # Initial populate
+        self._populate_db_tree()
+
+        split.add(tree_frame, weight=3)
+        split.add(preview_frame, weight=2)
+
+        return panel
+    
+    def _populate_db_tree(self):
+        if not hasattr(self, "db_tree"):
+            return
+        tree = self.db_tree
+        for item in tree.get_children():
+            tree.delete(item)
+
+        current = self.db_manager.current_db if hasattr(self.db_manager, "current_db") else None
+        root_label = f"postgres (connected)" if current else "No database selected"
+        root = tree.insert("", "end", text=f"{root_label}")
+
+        if not current:
+            return
+
+        # Example structure: schema -> Tables/Views/Functions -> table -> columns/Constraints/Indexes/Triggers
+        schema_node = tree.insert(root, "end", text="public")
+        tables_node = tree.insert(schema_node, "end", text="Tables")
+
+        try:
+            tables = self.db_manager.get_tables() if hasattr(self.db_manager, "get_tables") else []
+        except Exception:
+            tables = []
+
+        for table in tables:
+            t_node = tree.insert(tables_node, "end", text=table)
+            # Columns
+            cols_parent = tree.insert(t_node, "end", text="Columns")
+            try:
+                columns = self.db_manager.get_columns(table) if hasattr(self.db_manager, "get_columns") else []
+            except Exception:
+                columns = []
+            for col in columns:
+                # Expect dict with name, type, pk, fk, not_null, default
+                name = col.get("name", "col")
+                ctype = col.get("type", "")
+                flags = []
+                if col.get("pk"): flags.append("PK")
+                if col.get("fk"): flags.append("FK")
+                if col.get("not_null"): flags.append("NN")
+                if col.get("default") is not None: flags.append("DEF")
+                meta = (" ".join(flags)).strip()
+                label = f"{name}    {ctype} {meta}".rstrip()
+                tree.insert(cols_parent, "end", text=label)
+
+            # Subnodes
+            tree.insert(t_node, "end", text="Constraints")
+            tree.insert(t_node, "end", text="Indexes")
+            tree.insert(t_node, "end", text="Triggers")
+
+        # Views, Functions
+        tree.insert(schema_node, "end", text="Views")
+        tree.insert(schema_node, "end", text="Functions")
+    
+    def _on_db_search_change(self, event=None):
+        query = (self.db_search_entry.get() or "").strip().lower()
+        if not query:
+            self._populate_db_tree()
+            return
+        # Simple filter: rebuild tree with only matching table/column names
+        tree = self.db_tree
+        for item in tree.get_children():
+            tree.delete(item)
+
+        current = self.db_manager.current_db if hasattr(self.db_manager, "current_db") else None
+        root_label = f"postgres (connected)" if current else "No database selected"
+        root = tree.insert("", "end", text=f"{root_label}")
+        if not current:
+            return
+        schema_node = tree.insert(root, "end", text="public")
+        tables_node = tree.insert(schema_node, "end", text="Tables")
+        try:
+            tables = self.db_manager.get_tables() if hasattr(self.db_manager, "get_tables") else []
+        except Exception:
+            tables = []
+        for table in tables:
+            if query in table.lower():
+                tree.insert(tables_node, "end", text=table)
+                continue
+            try:
+                columns = self.db_manager.get_columns(table) if hasattr(self.db_manager, "get_columns") else []
+            except Exception:
+                columns = []
+            match_cols = [c for c in columns if query in c.get("name", "").lower()]
+            if match_cols:
+                t_node = tree.insert(tables_node, "end", text=table)
+                cols_parent = tree.insert(t_node, "end", text="Columns")
+                for col in match_cols:
+                    name = col.get("name", "col")
+                    ctype = col.get("type", "")
+                    tree.insert(cols_parent, "end", text=f"{name}    {ctype}")
     
     def create_collapse_button(self):
         """Create the collapse/expand button."""
@@ -180,277 +266,90 @@ class VSCodeSidebar:
         
         self.collapse_button = tk.Button(collapse_frame, text="◀", 
                                         command=self.toggle_collapse,
-                                        bg="#1e1e1e", fg="#cccccc", bd=0,
-                                        font=("Consolas", 10), width=3, height=1,
-                                        activebackground="#2d2d2d", activeforeground="#ffffff")
+                                        bg="#ffffff", fg="#333333", bd=0,
+                                        font=("Segoe UI", 10), width=3, height=1,
+                                        activebackground="#E6F3FF", activeforeground="#000000")
         self.collapse_button.pack(fill=tk.X)
         
     def toggle_collapse(self):
         """Toggle the sidebar collapse state."""
         if self.is_collapsed:
-            self.sidebar_frame.configure(width=280)
+            self.sidebar_frame.configure(width=300)
             self.collapse_button.configure(text="◀")
             self.is_collapsed = False
         else:
             self.sidebar_frame.configure(width=50)
             self.collapse_button.configure(text="▶")
             self.is_collapsed = True
-    
-    # Database methods
-    def refresh_databases(self):
-        """Refresh the databases list."""
-        tree = getattr(self, "databases_tree")
-        # Clear existing items
-        for item in tree.get_children():
-            tree.delete(item)
-            
-        # Get databases and create VS Code-style structure
-        databases = self.db_manager.get_databases()
-        for db in databases:
-            # Create database folder with chevron
-            db_item = tree.insert("", "end", text=f"📁 {db}", values=("database", db))
-            # Add database files
-            tree.insert(db_item, "end", text="📄 schema.sql", values=("file", "schema"))
-            tree.insert(db_item, "end", text="📄 data.sql", values=("file", "data"))
-            tree.insert(db_item, "end", text="📄 indexes.sql", values=("file", "indexes"))
-        
-        # Bind events
-        tree.bind("<Double-1>", self.on_database_double_click)
-        tree.bind("<Button-3>", self.on_database_right_click)
-        tree.bind("<Button-1>", self.on_database_single_click)
-        
-    def refresh_functions(self):
-        """Refresh the functions list."""
-        tree = getattr(self, "functions_tree")
-        # Clear existing items
-        for item in tree.get_children():
-            tree.delete(item)
-            
-        # Add sample functions (like VS Code shows files)
-        if self.db_manager.current_db:
-            tree.insert("", "end", text="📄 calculate_age.sql", values=("file",))
-            tree.insert("", "end", text="📄 format_name.sql", values=("file",))
-            tree.insert("", "end", text="📄 get_user_stats.sql", values=("file",))
-        else:
-            tree.insert("", "end", text="📄 No database selected", values=("placeholder",))
-        
-        # Bind events
-        tree.bind("<Double-1>", self.on_function_double_click)
-        tree.bind("<Button-3>", self.on_function_right_click)
-        
-    def refresh_views(self):
-        """Refresh the views list."""
-        tree = getattr(self, "views_tree")
-        # Clear existing items
-        for item in tree.get_children():
-            tree.delete(item)
-            
-        # Add sample views (like VS Code shows files)
-        if self.db_manager.current_db:
-            tree.insert("", "end", text="📄 user_summary.sql", values=("file",))
-            tree.insert("", "end", text="📄 sales_report.sql", values=("file",))
-            tree.insert("", "end", text="📄 active_users.sql", values=("file",))
-        else:
-            tree.insert("", "end", text="📄 No database selected", values=("placeholder",))
-        
-        # Bind events
-        tree.bind("<Double-1>", self.on_view_double_click)
-        tree.bind("<Button-3>", self.on_view_right_click)
-        
-    def refresh_triggers(self):
-        """Refresh the triggers list."""
-        tree = getattr(self, "triggers_tree")
-        # Clear existing items
-        for item in tree.get_children():
-            tree.delete(item)
-            
-        # Add sample triggers (like VS Code shows files)
-        if self.db_manager.current_db:
-            tree.insert("", "end", text="📄 audit_log_trigger.sql", values=("file",))
-            tree.insert("", "end", text="📄 update_timestamp.sql", values=("file",))
-            tree.insert("", "end", text="📄 validate_email.sql", values=("file",))
-        else:
-            tree.insert("", "end", text="📄 No database selected", values=("placeholder",))
-        
-        # Bind events
-        tree.bind("<Double-1>", self.on_trigger_double_click)
-        tree.bind("<Button-3>", self.on_trigger_right_click)
-        
-    def refresh_procedures(self):
-        """Refresh the procedures list."""
-        tree = getattr(self, "procedures_tree")
-        # Clear existing items
-        for item in tree.get_children():
-            tree.delete(item)
-            
-        # Add sample procedures (like VS Code shows files)
-        if self.db_manager.current_db:
-            tree.insert("", "end", text="📄 backup_database.sql", values=("file",))
-            tree.insert("", "end", text="📄 cleanup_old_data.sql", values=("file",))
-            tree.insert("", "end", text="📄 generate_report.sql", values=("file",))
-        else:
-            tree.insert("", "end", text="📄 No database selected", values=("placeholder",))
-        
-        # Bind events
-        tree.bind("<Double-1>", self.on_procedure_double_click)
-        tree.bind("<Button-3>", self.on_procedure_right_click)
-    
-    # Event handlers
-    def on_database_single_click(self, event):
-        """Handle database single click - toggle expand/collapse and open database."""
+    # Context menu and actions for DB panel
+    def _on_db_tree_right_click(self, event):
+        menu = tk.Menu(self.parent, tearoff=0)
+        menu.add_command(label="View Data", command=self._action_view_data)
+        menu.add_command(label="Edit", command=self._action_edit)
+        menu.add_command(label="Generate SQL", command=self._action_generate_sql)
+        menu.add_command(label="Script CREATE", command=self._action_script_create)
         try:
-            selection = self.databases_tree.selection()
-            if selection:
-                item = selection[0]
-                values = self.databases_tree.item(item)["values"]
-                if values and values[0] == "database":
-                    db_name = values[1]
-                    
-                    # Toggle database expand/collapse
-                    current_text = self.databases_tree.item(item)["text"]
-                    if current_text.startswith("📁"):
-                        # Expand database
-                        self.databases_tree.item(item, text=current_text.replace("📁", "📂"))
-                        # Show children
-                        for child in self.databases_tree.get_children(item):
-                            self.databases_tree.reattach(child, item, "end")
-                    else:
-                        # Collapse database
-                        self.databases_tree.item(item, text=current_text.replace("📂", "📁"))
-                        # Hide children
-                        for child in self.databases_tree.get_children(item):
-                            self.databases_tree.detach(child)
-                    
-                    # Also open the database on single click
-                    print(f"Single click - attempting to open database: {db_name}")
-                    try:
-                        if self.db_manager and self.db_manager.open_database(db_name):
-                            print(f"Successfully opened database: {db_name}")
-                            
-                            # Hide other modals to use full area
-                            self.hide_other_modals()
-                            
-                            # Refresh all sections
-                            self.refresh_functions()
-                            self.refresh_views()
-                            self.refresh_triggers()
-                            self.refresh_procedures()
-                            
-                            # Update the SQL editor to show current database
-                            if hasattr(self, 'sql_editor') and self.sql_editor and hasattr(self.sql_editor, 'editor'):
-                                # Clear editor and insert database info at the top
-                                self.sql_editor.editor.delete("1.0", tk.END)
-                                self.sql_editor.editor.insert("1.0", f"-- Current Database: {db_name}\n-- Ready to execute SQL queries\n\n")
-                                
-                                # Move cursor to the end
-                                self.sql_editor.editor.see(tk.END)
-                        else:
-                            print(f"Failed to open database: {db_name}")
-                    except Exception as e:
-                        print(f"Error opening database {db_name}: {e}")
-        except Exception as e:
-            print(f"Error in database single click: {e}")
-    
-    def on_database_double_click(self, event):
-        """Handle database double-click."""
-        selection = self.databases_tree.selection()
-        if selection:
-            item = selection[0]
-            values = self.databases_tree.item(item)["values"]
-            if values and values[0] == "database":
-                db_name = values[1]
-                print(f"Attempting to open database: {db_name}")
-                # Open database
-                if self.db_manager.open_database(db_name):
-                    print(f"Successfully opened database: {db_name}")
-                    # Refresh all sections
-                    self.refresh_functions()
-                    self.refresh_views()
-                    self.refresh_triggers()
-                    self.refresh_procedures()
-                    
-                    # Update the SQL editor to show current database
-                    if hasattr(self, 'sql_editor') and self.sql_editor:
-                        # Insert a comment showing current database
-                        current_text = self.sql_editor.editor.get("1.0", tk.END).strip()
-                        if not current_text:
-                            self.sql_editor.editor.insert("1.0", f"-- Current Database: {db_name}\n-- Ready to execute SQL queries\n\n")
-                else:
-                    print(f"Failed to open database: {db_name}")
-            
-    def on_database_right_click(self, event):
-        """Handle database right-click."""
-        # Create context menu
-        context_menu = tk.Menu(self.parent, tearoff=0)
-        context_menu.add_command(label="🗄️ Open Database", command=self.open_database)
-        context_menu.add_command(label="✏️ Rename Database", command=self.rename_database)
-        context_menu.add_command(label="🗑️ Delete Database", command=self.delete_database)
-        context_menu.add_separator()
-        context_menu.add_command(label="💾 Backup Database", command=self.backup_database)
-        context_menu.add_command(label="📂 Restore Database", command=self.restore_database)
-        
-        try:
-            context_menu.tk_popup(event.x_root, event.y_root)
+            menu.tk_popup(event.x_root, event.y_root)
         finally:
-            context_menu.grab_release()
-    
-    # Placeholder methods for other event handlers
-    def on_function_double_click(self, event): pass
-    def on_function_right_click(self, event): pass
-    def on_view_double_click(self, event): pass
-    def on_view_right_click(self, event): pass
-    def on_trigger_double_click(self, event): pass
-    def on_trigger_right_click(self, event): pass
-    def on_procedure_double_click(self, event): pass
-    def on_procedure_right_click(self, event): pass
-    
-    # Action methods
-    def create_database(self):
-        """Create a new database."""
-        from tkinter import simpledialog, messagebox
-        db_name = simpledialog.askstring("Create Database", "Enter database name:")
-        if db_name:
-            if self.db_manager.create_database(db_name):
-                messagebox.showinfo("Success", f"Database '{db_name}' created successfully.")
-                self.refresh_databases()
-            else:
-                messagebox.showerror("Error", f"Failed to create database '{db_name}'.")
-    
-    def create_function(self):
-        """Create a new function."""
-        from tkinter import messagebox
-        messagebox.showinfo("Create Function", "Function creation dialog will be implemented.")
-    
-    def create_view(self):
-        """Create a new view."""
-        from tkinter import messagebox
-        messagebox.showinfo("Create View", "View creation dialog will be implemented.")
-    
-    def create_trigger(self):
-        """Create a new trigger."""
-        from tkinter import messagebox
-        messagebox.showinfo("Create Trigger", "Trigger creation dialog will be implemented.")
-    
-    def create_procedure(self):
-        """Create a new procedure."""
-        from tkinter import messagebox
-        messagebox.showinfo("Create Procedure", "Procedure creation dialog will be implemented.")
-    
-    def hide_other_modals(self):
-        """Hide other modals to use full area when opening database."""
+            menu.grab_release()
+
+    def _on_db_tree_double_click(self, event):
+        # Show simple data preview for tables
+        sel = self.db_tree.selection()
+        if not sel:
+            return
+        node_text = self.db_tree.item(sel[0]).get("text", "")
+        parent = self.db_tree.parent(sel[0])
+        if parent:
+            parent_text = self.db_tree.item(parent).get("text", "")
+            is_table = self.db_tree.item(parent).get("text", "") != "Columns" and parent_text and parent_text != "Tables" and node_text and parent_text == "Tables"
+        else:
+            is_table = False
+
+        # Detect table node (child of Tables)
+        if self.db_tree.item(sel[0]).get("text", "") and self.db_tree.item(self.db_tree.parent(sel[0])).get("text", "") == "Tables":
+            table_name = node_text
+            self._show_table_preview(table_name)
+
+    def _show_table_preview(self, table_name):
+        frame = self.db_preview
+        for c in frame.winfo_children():
+            c.destroy()
+        label = ttk.Label(frame, text=f"Preview: {table_name}", font=("Segoe UI", 10, "bold"))
+        label.pack(anchor=tk.W, padx=6, pady=4)
+        text = tk.Text(frame, height=8, bg="#E6F3FF", fg="#1a1a1a", bd=0)
+        text.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
         try:
-            # Hide any existing popups or modals
-            if hasattr(self, 'sql_editor') and self.sql_editor:
-                # Close any existing AI popups
-                for widget in self.sql_editor.winfo_children():
-                    if isinstance(widget, tk.Toplevel):
-                        widget.destroy()
+            rows = []
+            if hasattr(self.db_manager, "preview_table"):
+                rows = self.db_manager.preview_table(table_name)
+            elif hasattr(self.db_manager, "fetch_preview"):
+                rows = self.db_manager.fetch_preview(table_name)
+                    else:
+                rows = []
+            for r in rows[:50]:
+                text.insert(tk.END, f"{r}\n")
         except Exception as e:
-            print(f"Error hiding modals: {e}")
-    
-    # Placeholder methods for other actions
-    def open_database(self): pass
-    def rename_database(self): pass
-    def delete_database(self): pass
-    def backup_database(self): pass
-    def restore_database(self): pass
+            text.insert(tk.END, f"Error previewing table: {e}")
+
+    # Placeholder context actions
+    def _action_view_data(self):
+        messagebox.showinfo("View Data", "Opening data preview…")
+
+    def _action_edit(self):
+        messagebox.showinfo("Edit", "Open editor for selected object…")
+
+    def _action_generate_sql(self):
+        messagebox.showinfo("Generate SQL", "Generating SQL…")
+
+    def _action_script_create(self):
+        messagebox.showinfo("Script CREATE", "Creating CREATE script…")
+
+    # Generic list panels for other tabs
+    def _create_list_panel(self, parent, title):
+        panel = ttk.Frame(parent, style="SideNav.TFrame")
+        search = self._create_search_bar(panel, f"Search {title}…")
+        listbox = tk.Listbox(panel, bd=0, highlightthickness=0)
+        listbox.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        listbox.insert(tk.END, f"No items. Connect to a database.")
+        return panel
