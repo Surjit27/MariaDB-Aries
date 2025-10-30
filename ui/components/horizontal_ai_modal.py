@@ -79,6 +79,13 @@ class HorizontalAIModal:
         self._base_modal_height = self.modal_height
         self._min_chat_extra_px = 36   # minimal visible chat height for very short messages
         
+        # Lightweight in-memory session context (rolling)
+        self.session_context = []  # list of {'role': 'user'|'assistant', 'content': str}
+        self._max_context_items = 10
+        
+        # Per-trigger AI response guard to avoid duplicate assistant blocks
+        self.ai_response_pending = False
+        
     def show_modal(self, event=None, position=None):
         """Show the horizontal AI modal with smart positioning and selection mode detection."""
         if self.is_visible:
@@ -302,6 +309,14 @@ class HorizontalAIModal:
         # Insert content
         self.chat_text.insert(tk.END, f"{content}\n", "normal_text")
         
+        # Record in rolling session context
+        try:
+            self.session_context.append({'role': role, 'content': content})
+            if len(self.session_context) > self._max_context_items:
+                self.session_context = self.session_context[-self._max_context_items:]
+        except Exception:
+            pass
+        
         # Add suggestion with inline buttons if provided
         if suggestion_data:
             self.add_code_suggestion_inline(suggestion_data)
@@ -344,8 +359,8 @@ class HorizontalAIModal:
         # Add new code - this should always exist
         if suggestion_data.get('new_code'):
             new_code = suggestion_data['new_code']
-            if suggestion_data.get('old_code') and suggestion_data['old_code']:
-                self.chat_text.insert(tk.END, f"NEW: ", "ai_suggestion_label")
+            # Always show NEW label even if no OLD
+            self.chat_text.insert(tk.END, f"NEW: ", "ai_suggestion_label")
             self.chat_text.insert(tk.END, f"{new_code}\n", "new_code")
         
         # Tight spacer before buttons
@@ -374,6 +389,18 @@ class HorizontalAIModal:
                               activebackground="#c82333",
                               activeforeground="#ffffff",
                               relief="flat")
+        
+        # Hover cursor and soft hover effects (safe, visual-only)
+        try:
+            keep_btn.configure(cursor="hand2")
+            discard_btn.configure(cursor="hand2")
+            # Soft hover tint
+            keep_btn.bind("<Enter>", lambda e, b=keep_btn: b.configure(bg="#2ecc71"))
+            keep_btn.bind("<Leave>", lambda e, b=keep_btn: b.configure(bg="#28a745"))
+            discard_btn.bind("<Enter>", lambda e, b=discard_btn: b.configure(bg="#e35d6a"))
+            discard_btn.bind("<Leave>", lambda e, b=discard_btn: b.configure(bg="#dc3545"))
+        except Exception:
+            pass
         
         # Insert buttons inline using window_create
         self.chat_text.window_create(tk.END, window=keep_btn)
@@ -964,16 +991,72 @@ class HorizontalAIModal:
             # Check if selection mode is active
             if getattr(self, 'selection_mode', False) and (self.selection_text is not None):
                 seltext = self.selection_text.strip()
-                # Strict validation for partial/invalid selection
+                # Detect partial selection (heuristic): lacks semicolon OR ends with incomplete clause
                 try:
-                    st = seltext.strip()
-                    if st and (not st.endswith(";") and not st.upper().startswith(("SELECT", "UPDATE", "INSERT", "DELETE"))):
-                        self._warn_once("⚠️ Please select a complete SQL statement.")
+                    st_up = seltext.strip().upper()
+                    is_partial = (not seltext.strip().endswith(';')) or st_up.endswith(('FROM', 'WHERE', 'JOIN', 'ON', 'GROUP BY', 'ORDER BY'))
+                except Exception:
+                    is_partial = False
+                # Partial selection -> predictive completion
+                if is_partial:
+                    banner = "🔍 Completing your SQL...\n\n"
+                    context_text = self._build_context_text()
+                    ai_prompt = f"""
+Complete the following partial SQL into a valid, executable SQLite query. Use context if relevant.
+
+PARTIAL_SQL:
+{seltext}
+
+CONTEXT:
+{context_text}
+
+Return only the completed SQL, no explanations or code fences.
+"""
+                    schema = None
+                    if self.db_manager and self.db_manager.current_db:
+                        try:
+                            tables = self.db_manager.get_tables()
+                            table_schema = []
+                            for t in tables:
+                                try:
+                                    cols, _ = self.db_manager.get_table_data(t, limit=1)
+                                    table_schema.append({"table_name": t, "columns": [{"name": c, "type": "TEXT"} for c in cols]})
+                                except:
+                                    table_schema.append({"table_name": t, "columns": []})
+                            schema = {"database_name": self.db_manager.current_db, "tables": table_schema, "relationships": []}
+                        except Exception as e:
+                            print(f"Schema (partial mode) error: {e}")
+                    ai_sql = None
+                    self.ai_response_pending = True
+                    try:
+                        ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
+                    except Exception as e:
+                        print(f"AI error: {e}")
+                    finally:
+                        self.ai_response_pending = False
+                    if not ai_sql or not str(ai_sql).strip():
+                        self._warn_once("⚠️ No response generated. Try rephrasing your query.")
                         self.input_entry.configure(state="normal")
                         self.input_var.set("")
                         return
-                except Exception:
-                    pass
+                    ai_sql_clean = self._clean_sql_display(ai_sql)
+                    if not self._looks_like_sql(ai_sql_clean):
+                        self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
+                        self.input_entry.configure(state="normal")
+                        self.input_var.set("")
+                        return
+                    merged = f"{banner}{ai_sql_clean}\n"
+                    self.add_chat_message("assistant", merged)
+                    # Add suggestion with NEW only (no OLD)
+                    self._add_suggestion_block("", ai_sql_clean)
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    if hasattr(self, 'chat_text'):
+                        self.chat_text.see('end')
+                    return
+                # Valid selection (full SQL) -> existing edit flow with suggestion block
+                # (unchanged below)
+                # Strict validation for partial/invalid selection already routed above
                 # Build banner and targeted prompt
                 banner = "🧠 Editing selected code...\n\n"
                 ai_prompt = f"""
@@ -998,12 +1081,19 @@ Return only the improved query, no explanations, code fences, or extra symbols.
                         schema = {"database_name": self.db_manager.current_db, "tables": table_schema, "relationships": []}
                     except Exception as e:
                         print(f"Schema (selection mode) error: {e}")
+                # Include session context for incremental improvements
+                context_text = self._build_context_text()
+                if context_text:
+                    ai_prompt += f"\nCONTEXT:\n{context_text}\n"
                 # Call AI
                 ai_sql = None
+                self.ai_response_pending = True
                 try:
                     ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
                 except Exception as e:
                     print(f"AI error: {e}")
+                finally:
+                    self.ai_response_pending = False
                 # Handle empty/missing response
                 if not ai_sql or not str(ai_sql).strip():
                     self._warn_once("⚠️ No response generated. Try rephrasing your query.")
@@ -1066,12 +1156,85 @@ Return only the improved query, no explanations, code fences, or extra symbols.
                     schema = {"database_name": self.db_manager.current_db, "tables": table_schemas, "relationships": []}
                 except Exception as e:
                     print(f"Schema extraction error: {e}")
+            # If empty prompt, start a draft using context and schema
             if not prompt_text:
-                self._warn_once("⚠️ Please enter a query or select code before running AI Assistant.")
+                banner = "🧠 Starting a new query draft...\n\n"
+                context_text = self._build_context_text()
+                ai_prompt = f"""
+Generate a relevant starter SQL query for this database. Use context if helpful.
+
+CONTEXT:
+{context_text}
+
+Return only the SQL, no explanations or code fences.
+"""
+                ai_sql = None
+                self.ai_response_pending = True
+                try:
+                    ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
+                except Exception as e:
+                    print(f"AI error: {e}")
+                finally:
+                    self.ai_response_pending = False
+                if not ai_sql or not str(ai_sql).strip():
+                    self._warn_once("⚠️ No response generated. Try rephrasing your query.")
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    return
+                ai_sql_clean = self._clean_sql_display(ai_sql)
+                if not self._looks_like_sql(ai_sql_clean):
+                    self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    return
+                merged = f"{banner}{ai_sql_clean}\n"
+                self.add_chat_message("assistant", merged)
                 self.input_entry.configure(state="normal")
                 self.input_var.set("")
+                if hasattr(self, 'chat_text'):
+                    self.chat_text.see('end')
                 return
-            # Require clear SQL intent in prompt before calling AI
+            # If non-SQL prompt but have context, continue predictively
+            if not self._looks_like_sql(prompt_text) and self.session_context:
+                context_text = self._build_context_text()
+                ai_prompt = f"""
+Modify or extend the previous SQL based on this instruction:
+
+INSTRUCTION: {prompt_text}
+
+CONTEXT:
+{context_text}
+
+Return only the final SQL, no explanations or code fences.
+"""
+                ai_sql = None
+                self.ai_response_pending = True
+                try:
+                    ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
+                except Exception as e:
+                    print(f"AI error: {e}")
+                finally:
+                    self.ai_response_pending = False
+                # Show user instruction then assistant single SQL line
+                self.add_chat_message("user", prompt_text)
+                if not ai_sql or not str(ai_sql).strip():
+                    self._warn_once("⚠️ No response generated. Try rephrasing your query.")
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    return
+                ai_sql_clean = self._clean_sql_display(ai_sql)
+                if not self._looks_like_sql(ai_sql_clean):
+                    self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    return
+                self.add_chat_message("assistant", ai_sql_clean)
+                self.input_entry.configure(state="normal")
+                self.input_var.set("")
+                if hasattr(self, 'chat_text'):
+                    self.chat_text.see('end')
+                return
+            # Otherwise require SQL intent as before
             if not self._looks_like_sql(prompt_text):
                 self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
                 self.input_entry.configure(state="normal")
@@ -1085,11 +1248,18 @@ Requirements:
 - Use proper SQLite syntax
 {f"- Database context: {self.db_manager.current_db}" if self.db_manager and self.db_manager.current_db else ""}
 """
+            # Include context for continuity even in plain mode
+            context_text = self._build_context_text()
+            if context_text:
+                enhanced_prompt += f"\nCONTEXT:\n{context_text}\n"
             ai_sql = None
+            self.ai_response_pending = True
             try:
                 ai_sql = self.ai_integration.generate_sql_query(enhanced_prompt, schema)
             except Exception as e:
                 print(f"AI error: {e}")
+            finally:
+                self.ai_response_pending = False
             # Assistant line should always show user request
             self.add_chat_message("user", prompt_text)
             if not ai_sql or not str(ai_sql).strip():
@@ -1276,6 +1446,9 @@ Requirements:
         if hasattr(self, 'chat_text'):
             self.chat_text.delete("1.0", tk.END)
         
+        # Reset session context
+        self.session_context = []
+        
         # Remove all highlights
         if hasattr(self.sql_editor, 'editor'):
             self.sql_editor.editor.tag_remove("ai_old", "1.0", tk.END)
@@ -1388,7 +1561,7 @@ Requirements:
 
     def _warn_once(self, message_text):
         try:
-            if getattr(self, 'warning_active', False):
+            if getattr(self, 'warning_active', False) or getattr(self, 'ai_response_pending', False):
                 return
             self.add_chat_message("assistant", message_text)
             self.warning_active = True
@@ -1423,5 +1596,36 @@ Requirements:
         try:
             # Allow geometry to stabilize, then compute and apply target height
             self.modal_window.after(10, self._auto_resize_chat)
+        except Exception:
+            pass
+
+    def _build_context_text(self):
+        """Return a concise text representation of recent chat context for AI prompts."""
+        try:
+            if not self.session_context:
+                return ""
+            lines = []
+            for item in self.session_context[-self._max_context_items:]:
+                role = item.get('role', 'user')
+                content = (item.get('content') or '').strip()
+                if not content:
+                    continue
+                prefix = 'USER' if role == 'user' else 'ASSISTANT'
+                lines.append(f"{prefix}: {content}")
+            return "\n".join(lines[-self._max_context_items:])
+        except Exception:
+            return ""
+
+    def _add_suggestion_block(self, old_code, new_code, old_start=None, old_end=None):
+        """Render a suggestion block using existing chat insertion. OLD may be empty."""
+        try:
+            suggestion_data = {
+                'old_code': old_code if old_code else None,
+                'new_code': new_code,
+                'old_start': old_start,
+                'old_end': old_end
+            }
+            # Use assistant message with suggestion data (existing path)
+            self.add_chat_message("assistant", "", suggestion_data)
         except Exception:
             pass
