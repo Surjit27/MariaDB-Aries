@@ -129,9 +129,8 @@ class HorizontalAIModal:
         self.modal_window.wm_attributes("-topmost", True)
         self.modal_window.wm_attributes("-alpha", 0.95)
         
-        # Prevent modal from losing focus
+        # Focus modal but do not grab, so editor selection still works
         self.modal_window.focus_force()
-        self.modal_window.grab_set()
         
         # Create main frame with subtle shadow effect
         main_frame = tk.Frame(self.modal_window, bg="#2d2d2d", relief="raised", bd=1)
@@ -160,6 +159,12 @@ class HorizontalAIModal:
         if hasattr(self.sql_editor, 'editor'):
             self.sql_editor.editor.bind("<Button-1>", self.on_editor_click)
             self.sql_editor.editor.bind("<Key>", self.on_editor_key)
+            # Support dropping orange prompt highlight
+            try:
+                self.sql_editor.editor.bind("<Double-1>", self.on_editor_double_click, add='+')
+                self.sql_editor.editor.bind("<ButtonRelease-1>", self.on_editor_selection_release, add='+')
+            except Exception:
+                pass
         
         # Focus and select text
         self.input_entry.focus()
@@ -484,6 +489,13 @@ class HorizontalAIModal:
                 # Highlight applied code in green
                 new_end = self.sql_editor.editor.index(f"{old_start}+{len(text)}c")
                 self.highlight_applied_code(old_start, new_end)
+                # Tag for undo
+                try:
+                    self.sql_editor.editor.tag_remove("ai_last_insert", "1.0", tk.END)
+                except Exception:
+                    pass
+                self.sql_editor.editor.tag_add("ai_last_insert", old_start, new_end)
+                self._last_ai_insert_range = (old_start, new_end)
             else:
                 # Insert at cursor
                 cursor_pos = self.sql_editor.editor.index(tk.INSERT)
@@ -493,6 +505,13 @@ class HorizontalAIModal:
                 # Highlight applied code
                 new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
                 self.highlight_applied_code(cursor_pos, new_end)
+                # Tag for undo
+                try:
+                    self.sql_editor.editor.tag_remove("ai_last_insert", "1.0", tk.END)
+                except Exception:
+                    pass
+                self.sql_editor.editor.tag_add("ai_last_insert", cursor_pos, new_end)
+                self._last_ai_insert_range = (cursor_pos, new_end)
             
             # Add confirmation message to chat
             self.add_confirmation_message("✅ Query inserted")
@@ -679,6 +698,34 @@ class HorizontalAIModal:
             self.modal_window.bind("<KeyPress-space>", lambda e: self.hide_dropdown())
         except Exception:
             pass
+        # Keyboard shortcuts: Ctrl+? or Ctrl+/ to send; press again to undo last AI insertion
+        try:
+            sequences = (
+                "<Control-question>",
+                "<Control-slash>",
+                "<Control-Shift-slash>",
+                "<Control-Key-/>",
+                "<Control-Shift-Key-/>",
+                "<Control-Key-KP_Divide>",
+            )
+            for seq in sequences:
+                self.modal_window.bind(seq, self._handle_ctrl_question, add='+')
+                if self.input_entry:
+                    self.input_entry.bind(seq, self._handle_ctrl_question, add='+')
+                if hasattr(self.sql_editor, 'editor'):
+                    self.sql_editor.editor.bind(seq, self._handle_ctrl_question, add='+')
+                self.parent.bind(seq, self._handle_ctrl_question, add='+')
+            # Global capture to ensure default behavior is suppressed
+            try:
+                self.parent.bind_all("<Control-slash>", self._handle_ctrl_question, add='+')
+                self.parent.bind_all("<Control-Shift-slash>", self._handle_ctrl_question, add='+')
+                self.parent.bind_all("<Control-Key-/>", self._handle_ctrl_question, add='+')
+                self.parent.bind_all("<Control-Shift-Key-/>", self._handle_ctrl_question, add='+')
+                self.parent.bind_all("<Control-question>", self._handle_ctrl_question, add='+')
+            except Exception:
+                pass
+        except Exception:
+            pass
         
     def on_key_press(self, event):
         """Handle key press events for @ and # triggers."""
@@ -753,6 +800,66 @@ class HorizontalAIModal:
     def on_modal_click(self, event):
         """Handle click on modal to prevent auto-hide."""
         pass
+
+    def _debug_print_prompt(self, prompt_text: str):
+        try:
+            print("\n===== AI PROMPT (BEGIN) =====")
+            print(prompt_text)
+            print("===== AI PROMPT (END) =====\n")
+        except Exception as e:
+            try:
+                print(f"[AI PROMPT DEBUG ERROR]: {e}")
+            except Exception:
+                pass
+
+    def _handle_ctrl_question(self, event=None):
+        try:
+            # Always prevent default behavior for this shortcut
+            result_break = "break"
+            # If there is a last AI insertion and no selection and input empty -> undo
+            has_sel = False
+            try:
+                has_sel = bool(self.sql_editor.editor.tag_ranges(tk.SEL))
+            except Exception:
+                has_sel = False
+            try:
+                input_empty = not bool((self.input_var.get() or '').strip())
+            except Exception:
+                input_empty = True
+            if getattr(self, '_last_ai_insert_range', None) and (not has_sel) and input_empty:
+                self._undo_last_ai_insertion()
+                return result_break
+            # Otherwise send/generate
+            self.generate_sql()
+            return result_break
+        except Exception:
+            try:
+                self.generate_sql()
+            except Exception:
+                pass
+            return "break"
+
+    def _undo_last_ai_insertion(self):
+        try:
+            rng = getattr(self, '_last_ai_insert_range', None)
+            if not rng:
+                self.add_confirmation_message("ℹ️ Nothing to undo")
+                return
+            start_idx, end_idx = rng
+            # Remove content if range still valid
+            try:
+                self.sql_editor.editor.delete(start_idx, end_idx)
+            except Exception:
+                pass
+            # Remove tag and clear marker
+            try:
+                self.sql_editor.editor.tag_remove("ai_last_insert", "1.0", tk.END)
+            except Exception:
+                pass
+            self._last_ai_insert_range = None
+            self.add_confirmation_message("↶ Undone last AI insertion")
+        except Exception as e:
+            print("Undo last AI insertion error:", e)
 
     # --- Dragging and boundary clamp ---
     def _enable_drag_on(self, widget):
@@ -1130,7 +1237,7 @@ class HorizontalAIModal:
                     # Highlight the selected text
                     sel_start = self.sql_editor.editor.index(tk.SEL_FIRST)
                     sel_end = self.sql_editor.editor.index(tk.SEL_LAST)
-                    self.highlight_selected_text(sel_start, sel_end)
+                    self.highlight_prompt_text(sel_start, sel_end)
                     return selected_text.strip()
         except tk.TclError:
             # No selection
@@ -1208,6 +1315,7 @@ Return only the completed SQL, no explanations or code fences.
                     ai_sql = None
                     self.ai_response_pending = True
                     try:
+                        self._debug_print_prompt(ai_prompt)
                         ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
                     except Exception as e:
                         print(f"AI error: {e}")
@@ -1273,6 +1381,7 @@ Return only the improved query, no explanations, code fences, or extra symbols.
                 ai_sql = None
                 self.ai_response_pending = True
                 try:
+                    self._debug_print_prompt(ai_prompt)
                     ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
                 except Exception as e:
                     print(f"AI error: {e}")
@@ -1366,6 +1475,7 @@ Return only the SQL, no explanations or code fences.
                 ai_sql = None
                 self.ai_response_pending = True
                 try:
+                    self._debug_print_prompt(ai_prompt)
                     ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
                 except Exception as e:
                     print(f"AI error: {e}")
@@ -1417,6 +1527,7 @@ Return only the final SQL, no explanations or code fences.
                 ai_sql = None
                 self.ai_response_pending = True
                 try:
+                    self._debug_print_prompt(ai_prompt)
                     ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
                 except Exception as e:
                     print(f"AI error: {e}")
@@ -1464,6 +1575,7 @@ Requirements:
             ai_sql = None
             self.ai_response_pending = True
             try:
+                self._debug_print_prompt(enhanced_prompt)
                 ai_sql = self.ai_integration.generate_sql_query(enhanced_prompt, schema)
             except Exception as e:
                 print(f"AI error: {e}")
@@ -1545,30 +1657,17 @@ Requirements:
         except Exception as e:
             print(f"Error highlighting text: {e}")
     
-    def highlight_selected_text(self, start_pos, end_pos):
-        """Highlight selected text with a different color."""
+    def highlight_prompt_text(self, start_pos, end_pos):
+        """Persistently highlight text sent to AI in orange until removed by the user."""
         try:
-            # Configure selection highlighting tags with more visible colors
-            self.sql_editor.editor.tag_configure("ai_selected", 
-                                                background="#8B0000",  # Dark red background
-                                                foreground="#FFFFFF",  # White text for better contrast
-                                                relief="raised",
-                                                borderwidth=2)
-            
-            # Apply the highlight tag
-            self.sql_editor.editor.tag_add("ai_selected", start_pos, end_pos)
-            
-            # Auto-remove highlight after 3 seconds
-            try:
-                if self.modal_window and self.modal_window.winfo_exists():
-                    self.modal_window.after(3000, lambda: self.remove_highlight("ai_selected"))
-                else:
-                    self.sql_editor.editor.after(3000, lambda: self.remove_highlight("ai_selected"))
-            except Exception:
-                self.sql_editor.editor.after(3000, lambda: self.remove_highlight("ai_selected"))
-            
+            self.sql_editor.editor.tag_configure("ai_prompt",
+                                                background="#ff8c00",  # Orange background
+                                                foreground="#000000",
+                                                relief="flat",
+                                                borderwidth=0)
+            self.sql_editor.editor.tag_add("ai_prompt", start_pos, end_pos)
         except Exception as e:
-            print(f"Error highlighting selected text: {e}")
+            print(f"Error highlighting prompt text: {e}")
     
     def remove_highlight(self, tag_name):
         """Remove highlighting from text."""
@@ -1582,6 +1681,7 @@ Requirements:
         try:
             self.sql_editor.editor.tag_remove("ai_selected", "1.0", tk.END)
             self.sql_editor.editor.tag_remove("ai_replaced", "1.0", tk.END)
+            # Do not auto-remove ai_prompt; it's persistent until user drops it
         except Exception as e:
             print(f"Error removing highlights: {e}")
     
@@ -1592,6 +1692,49 @@ Requirements:
     def on_editor_key(self, event):
         """Handle key events in the SQL editor to remove highlights."""
         self.remove_all_highlights()
+
+    def on_editor_double_click(self, event):
+        """Drop orange prompt highlight on double-click inside it."""
+        try:
+            idx = self.sql_editor.editor.index(f"@{event.x},{event.y}")
+            for i in range(0, 100):  # iterate tag ranges safely
+                ranges = self.sql_editor.editor.tag_ranges("ai_prompt")
+                if not ranges:
+                    return
+                # ranges are start1, end1, start2, end2, ...
+                hit = False
+                for j in range(0, len(ranges), 2):
+                    s = str(ranges[j])
+                    e = str(ranges[j+1])
+                    if self.sql_editor.editor.compare(idx, ">=", s) and self.sql_editor.editor.compare(idx, "<=", e):
+                        self.sql_editor.editor.tag_remove("ai_prompt", s, e)
+                        hit = True
+                        break
+                if not hit:
+                    break
+        except Exception:
+            pass
+
+    def on_editor_selection_release(self, event):
+        """If user over-selects beyond orange highlight, drop it."""
+        try:
+            if not self.sql_editor.editor.tag_ranges(tk.SEL):
+                return
+            sel_start = self.sql_editor.editor.index(tk.SEL_FIRST)
+            sel_end = self.sql_editor.editor.index(tk.SEL_LAST)
+            ranges = self.sql_editor.editor.tag_ranges("ai_prompt")
+            if not ranges:
+                return
+            # If selection extends outside any prompt range, remove those ranges
+            for j in range(0, len(ranges), 2):
+                s = str(ranges[j])
+                e = str(ranges[j+1])
+                over_left = self.sql_editor.editor.compare(sel_start, "<", s)
+                over_right = self.sql_editor.editor.compare(sel_end, ">", e)
+                if over_left or over_right:
+                    self.sql_editor.editor.tag_remove("ai_prompt", s, e)
+        except Exception:
+            pass
     
     # Removed try_alternative_generation and handle_incomplete_query - no longer needed
     # These methods caused UI spam with retry messages
@@ -1619,6 +1762,13 @@ Requirements:
                 
                 # Highlight the replaced text with a different color
                 self.highlight_replaced_text(insert_pos, new_end)
+                # Tag for undo
+                try:
+                    self.sql_editor.editor.tag_remove("ai_last_insert", "1.0", tk.END)
+                except Exception:
+                    pass
+                self.sql_editor.editor.tag_add("ai_last_insert", insert_pos, new_end)
+                self._last_ai_insert_range = (insert_pos, new_end)
             else:
                 # No selection, insert at cursor position
                 cursor_pos = self.sql_editor.editor.index(tk.INSERT)
@@ -1628,6 +1778,13 @@ Requirements:
                 # Highlight the inserted text
                 new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
                 self.highlight_replaced_text(cursor_pos, new_end)
+                # Tag for undo
+                try:
+                    self.sql_editor.editor.tag_remove("ai_last_insert", "1.0", tk.END)
+                except Exception:
+                    pass
+                self.sql_editor.editor.tag_add("ai_last_insert", cursor_pos, new_end)
+                self._last_ai_insert_range = (cursor_pos, new_end)
         except tk.TclError:
             # Fallback: insert at cursor position
             cursor_pos = self.sql_editor.editor.index(tk.INSERT)
@@ -1637,6 +1794,13 @@ Requirements:
             # Highlight the inserted text
             new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
             self.highlight_replaced_text(cursor_pos, new_end)
+            # Tag for undo
+            try:
+                self.sql_editor.editor.tag_remove("ai_last_insert", "1.0", tk.END)
+            except Exception:
+                pass
+            self.sql_editor.editor.tag_add("ai_last_insert", cursor_pos, new_end)
+            self._last_ai_insert_range = (cursor_pos, new_end)
         
     # Old popup methods removed - now using inline chat interface
     # def show_sql_popup(self, sql):
