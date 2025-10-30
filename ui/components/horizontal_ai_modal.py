@@ -62,7 +62,7 @@ class HorizontalAIModal:
         # Configuration
         self.modal_width = 800
         self.modal_height = 120
-        self.chat_height = 300
+        self.chat_height = 150
         self.auto_hide_delay = 10000  # 10 seconds
         self.chat_expanded = False
         
@@ -149,6 +149,12 @@ class HorizontalAIModal:
         
         # Bind events
         self.bind_events()
+        # Enable dragging and clamp within app window
+        try:
+            self._enable_drag_on(self.modal_window)
+            self.parent.bind("<Configure>", lambda e: self._on_parent_resize_or_state(e), add='+')
+        except Exception:
+            pass
         
         # Bind click events to SQL editor to remove highlights
         if hasattr(self.sql_editor, 'editor'):
@@ -325,6 +331,37 @@ class HorizontalAIModal:
         self.chat_text.see(tk.END)
         self._auto_resize_chat()
         self._resize_to_content()
+    
+    def _compute_gapped_text(self, insert_pos: str, new_code: str) -> str:
+        """Return new_code wrapped so there is exactly one blank line before and after it."""
+        try:
+            editor = self.sql_editor.editor
+            body = (new_code or "").strip("\n")
+            # Determine prefix
+            try:
+                prev_two = editor.get(f"{insert_pos}-2c", insert_pos)
+            except Exception:
+                prev_two = ""
+            if prev_two.endswith("\n\n"):
+                prefix = ""
+            elif prev_two.endswith("\n"):
+                prefix = "\n"
+            else:
+                prefix = "\n\n"
+            # Determine suffix
+            try:
+                next_two = editor.get(insert_pos, f"{insert_pos}+2c")
+            except Exception:
+                next_two = ""
+            if next_two.startswith("\n\n"):
+                suffix = ""
+            elif next_two.startswith("\n"):
+                suffix = "\n"
+            else:
+                suffix = "\n\n"
+            return prefix + body + suffix
+        except Exception:
+            return "\n\n" + (new_code or "").strip("\n") + "\n\n"
         
         # Store message info for tracking
         self.chat_messages.append({
@@ -335,6 +372,21 @@ class HorizontalAIModal:
         
         # Add smooth fade-in effect
         self.animate_message_fade()
+        
+        # If assistant returned SQL, show compact Keep/Reject actions
+        try:
+            if role == "assistant":
+                if suggestion_data and suggestion_data.get('new_code'):
+                    # Suggestion already rendered; nothing else needed
+                    pass
+                elif self._looks_like_sql(content or ""):
+                    # Render compact suggestion for plain SQL answer
+                    try:
+                        self._add_suggestion_block("", content)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
     
     def add_code_suggestion_inline(self, suggestion_data):
         """Add code suggestion inline with Keep/Discard buttons using window_create."""
@@ -366,29 +418,21 @@ class HorizontalAIModal:
         # Tight spacer before buttons
         self.chat_text.insert(tk.END, "\n", "normal_text")
         
-        # Create Keep button
+        # Create compact text-like buttons (no box background)
         keep_btn = tk.Button(self.chat_text,
-                            text="✓ Keep",
-                            command=lambda: self.handle_keep_suggestion(suggestion_data),
-                            bg="#28a745", fg="#ffffff", bd=0,
-                            font=("Arial", 9, "bold"),
-                            width=8,
-                            height=1,
-                            activebackground="#218838",
-                            activeforeground="#ffffff",
-                            relief="flat")
-        
-        # Create Discard button
+                            text="Keep",
+                            bg="#1e1e1e", fg="#17a2b8", bd=0,
+                            font=("Arial", 9, "underline"),
+                            cursor="hand2",
+                            relief="flat", activebackground="#1e1e1e",
+                            activeforeground="#1fbad1", highlightthickness=0)
         discard_btn = tk.Button(self.chat_text,
-                              text="✕ Discard",
-                              command=lambda: self.handle_discard_suggestion(suggestion_data),
-                              bg="#dc3545", fg="#ffffff", bd=0,
-                              font=("Arial", 9, "bold"),
-                              width=8,
-                              height=1,
-                              activebackground="#c82333",
-                              activeforeground="#ffffff",
-                              relief="flat")
+                              text="Reject",
+                              bg="#1e1e1e", fg="#bbbbbb", bd=0,
+                              font=("Arial", 9, "underline"),
+                              cursor="hand2",
+                              relief="flat", activebackground="#1e1e1e",
+                              activeforeground="#cccccc", highlightthickness=0)
         
         # Hover cursor and soft hover effects (safe, visual-only)
         try:
@@ -402,17 +446,23 @@ class HorizontalAIModal:
         except Exception:
             pass
         
-        # Insert buttons inline using window_create
-        self.chat_text.window_create(tk.END, window=keep_btn)
-        self.chat_text.insert(tk.END, " ")
-        self.chat_text.window_create(tk.END, window=discard_btn)
+        # Insert buttons inline using window_create (compact spacing)
+        keep_btn_ref = keep_btn
+        discard_btn_ref = discard_btn
+        # Now that refs exist, bind commands
+        keep_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_keep_action(s, kb, rb))
+        discard_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_reject_action(s, kb, rb))
+
+        self.chat_text.window_create(tk.END, window=keep_btn_ref)
+        self.chat_text.insert(tk.END, "    ")
+        self.chat_text.window_create(tk.END, window=discard_btn_ref)
         self.chat_text.insert(tk.END, "\n", "normal_text")
         
         # Store button references for tracking
         suggestion_id = f"suggestion_{len(self.chat_messages)}"
         self.inline_buttons[suggestion_id] = {
-            'keep': keep_btn,
-            'discard': discard_btn,
+            'keep': keep_btn_ref,
+            'discard': discard_btn_ref,
             'data': suggestion_data
         }
         
@@ -428,22 +478,24 @@ class HorizontalAIModal:
                 old_start = suggestion_data['old_start']
                 old_end = suggestion_data['old_end']
                 self.sql_editor.editor.delete(old_start, old_end)
-                self.sql_editor.editor.insert(old_start, suggestion_data['new_code'])
+                text = self._compute_gapped_text(old_start, suggestion_data['new_code'])
+                self.sql_editor.editor.insert(old_start, text)
                 
                 # Highlight applied code in green
-                new_end = self.sql_editor.editor.index(f"{old_start}+{len(suggestion_data['new_code'])}c")
+                new_end = self.sql_editor.editor.index(f"{old_start}+{len(text)}c")
                 self.highlight_applied_code(old_start, new_end)
             else:
                 # Insert at cursor
                 cursor_pos = self.sql_editor.editor.index(tk.INSERT)
-                self.sql_editor.editor.insert(cursor_pos, suggestion_data['new_code'])
+                text = self._compute_gapped_text(cursor_pos, suggestion_data['new_code'])
+                self.sql_editor.editor.insert(cursor_pos, text)
                 
                 # Highlight applied code
-                new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(suggestion_data['new_code'])}c")
+                new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
                 self.highlight_applied_code(cursor_pos, new_end)
             
             # Add confirmation message to chat
-            self.add_confirmation_message("✅ Change applied successfully")
+            self.add_confirmation_message("✅ Query inserted")
             
             # Disable buttons
             self.disable_suggestion_buttons(suggestion_data)
@@ -451,6 +503,30 @@ class HorizontalAIModal:
         except Exception as e:
             print(f"Error applying suggestion: {e}")
             self.add_confirmation_message(f"❌ Error applying suggestion: {str(e)}")
+
+    def _compact_keep_action(self, suggestion_data, keep_btn_ref, discard_btn_ref):
+        try:
+            self.handle_keep_suggestion(suggestion_data)
+            try:
+                keep_btn_ref.config(text="Query inserted", state=tk.DISABLED, fg="#28a745", font=("Arial", 9))
+                discard_btn_ref.config(state=tk.DISABLED)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def _compact_reject_action(self, suggestion_data, keep_btn_ref, discard_btn_ref):
+        try:
+            self.handle_discard_suggestion(suggestion_data)
+            try:
+                discard_btn_ref.config(text="Query rejected", state=tk.DISABLED, fg="#dc3545", font=("Arial", 9))
+                keep_btn_ref.config(state=tk.DISABLED)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    # Removed inline Insert/Undo bar per new compact UX
     
     def handle_discard_suggestion(self, suggestion_data):
         """Handle Discard button click - ignore suggestion."""
@@ -459,7 +535,7 @@ class HorizontalAIModal:
             self.remove_old_highlight(suggestion_data['old_start'], suggestion_data['old_end'])
         
         # Add discard message to chat
-        self.add_confirmation_message("❌ Change discarded")
+        self.add_confirmation_message("❌ Query rejected")
         
         # Disable buttons
         self.disable_suggestion_buttons(suggestion_data)
@@ -597,6 +673,12 @@ class HorizontalAIModal:
         # Modal events
         self.modal_window.bind("<FocusOut>", self.on_modal_focus_out)
         self.modal_window.bind("<Button-1>", self.on_modal_click)
+        # Hide dropdowns on space anywhere in the modal
+        try:
+            self.modal_window.bind("<space>", lambda e: self.hide_dropdown())
+            self.modal_window.bind("<KeyPress-space>", lambda e: self.hide_dropdown())
+        except Exception:
+            pass
         
     def on_key_press(self, event):
         """Handle key press events for @ and # triggers."""
@@ -614,7 +696,7 @@ class HorizontalAIModal:
             print("Showing column dropdown")  # Debug print
             self.show_column_dropdown()
             return "break"
-        elif char == ' ':
+        elif char == ' ' or keysym == 'space':
             # Hide dropdowns on space
             self.hide_dropdown()
         
@@ -632,6 +714,12 @@ class HorizontalAIModal:
             print("Key release: @ detected")
         elif char == '#' or keysym == 'numbersign':
             print("Key release: # detected")
+        elif char == ' ' or keysym == 'space':
+            # Also hide dropdowns on space key release
+            try:
+                self.hide_dropdown()
+            except Exception:
+                pass
     
     def on_text_change(self, *args):
         """Handle text changes in the input field."""
@@ -665,6 +753,100 @@ class HorizontalAIModal:
     def on_modal_click(self, event):
         """Handle click on modal to prevent auto-hide."""
         pass
+
+    # --- Dragging and boundary clamp ---
+    def _enable_drag_on(self, widget):
+        try:
+            self._drag_origin = {'x': 0, 'y': 0}
+            self._is_dragging = False
+            widget.bind("<ButtonPress-1>", self._on_drag_start, add='+')
+            widget.bind("<B1-Motion>", self._on_drag_motion, add='+')
+            widget.bind("<ButtonRelease-1>", self._on_drag_end, add='+')
+        except Exception:
+            pass
+
+    def _on_drag_start(self, event):
+        try:
+            self._is_dragging = True
+            # Store offset between cursor and window's top-left in root coords
+            win_rx = self.modal_window.winfo_rootx()
+            win_ry = self.modal_window.winfo_rooty()
+            self._drag_offset_x = event.x_root - win_rx
+            self._drag_offset_y = event.y_root - win_ry
+        except Exception:
+            pass
+
+    def _on_drag_motion(self, event):
+        try:
+            # Desired top-left in root coords, keeping cursor at same offset
+            desired_x = event.x_root - getattr(self, '_drag_offset_x', 0)
+            desired_y = event.y_root - getattr(self, '_drag_offset_y', 0)
+            w = self.modal_window.winfo_width()
+            h = self.modal_window.winfo_height()
+            cx, cy = self._clamp_within_parent(desired_x, desired_y, w, h)
+            self.modal_window.wm_geometry(f"{w}x{h}+{cx}+{cy}")
+        except Exception:
+            pass
+
+    def _on_drag_end(self, event):
+        try:
+            self._is_dragging = False
+            self._drag_offset_x = 0
+            self._drag_offset_y = 0
+            self._clamp_modal()
+        except Exception:
+            pass
+
+    def _on_parent_resize_or_state(self, event=None):
+        try:
+            # Close on minimize
+            try:
+                if hasattr(self.parent, 'state') and self.parent.state() == 'iconic':
+                    self.hide_modal()
+                    return
+            except Exception:
+                pass
+            # Close on fullscreen
+            try:
+                if hasattr(self.parent, 'attributes') and bool(self.parent.attributes('-fullscreen')):
+                    self.hide_modal()
+                    return
+            except Exception:
+                pass
+            # Otherwise clamp position inside window bounds
+            self._clamp_modal()
+        except Exception:
+            pass
+
+    def _clamp_modal(self):
+        try:
+            if not self.is_modal_visible():
+                return
+            w = self.modal_window.winfo_width()
+            h = self.modal_window.winfo_height()
+            # Toplevel winfo_x/y are already in root (screen) coordinates
+            x = self.modal_window.winfo_x()
+            y = self.modal_window.winfo_y()
+            cx, cy = self._clamp_within_parent(x, y, w, h)
+            self.modal_window.wm_geometry(f"{w}x{h}+{cx}+{cy}")
+        except Exception:
+            pass
+
+    def _clamp_within_parent(self, abs_x: int, abs_y: int, w: int, h: int):
+        try:
+            px = self.parent.winfo_rootx()
+            py = self.parent.winfo_rooty()
+            pw = max(1, self.parent.winfo_width())
+            ph = max(1, self.parent.winfo_height())
+            min_x = px
+            min_y = py
+            max_x = px + max(0, pw - w)
+            max_y = py + max(0, ph - h)
+            nx = min(max(abs_x, min_x), max_x)
+            ny = min(max(abs_y, min_y), max_y)
+            return nx, ny
+        except Exception:
+            return abs_x, abs_y
         
     def show_table_dropdown(self):
         """Show table selection dropdown."""
@@ -976,13 +1158,6 @@ class HorizontalAIModal:
         # Reset per-trigger warning flag
         self.warning_active = False
         prompt = self.input_var.get().strip()
-        # Strict trigger rule: require prompt or valid selection
-        if not prompt and not getattr(self, 'selection_mode', False):
-            self._warn_once("⚠️ Please enter a query or select code before running AI Assistant.")
-            return
-        if not prompt and getattr(self, 'selection_mode', False) and not self.selection_text:
-            self._warn_once("⚠️ Please enter a query or select code before running AI Assistant.")
-            return
         # Show loading state
         self.input_entry.configure(state="disabled")
         self.input_var.set("🤖 Generating...")
@@ -1000,7 +1175,11 @@ class HorizontalAIModal:
                 # Partial selection -> predictive completion
                 if is_partial:
                     banner = "🔍 Completing your SQL...\n\n"
-                    context_text = self._build_context_text()
+                    er_text = self._get_er_text()
+                    mentions_text = self._get_mentions_text()
+                    base = self._build_context_text()
+                    parts = [p for p in [base, er_text, mentions_text] if p]
+                    context_text = "\n".join(parts)
                     ai_prompt = f"""
 Complete the following partial SQL into a valid, executable SQLite query. Use context if relevant.
 
@@ -1082,7 +1261,12 @@ Return only the improved query, no explanations, code fences, or extra symbols.
                     except Exception as e:
                         print(f"Schema (selection mode) error: {e}")
                 # Include session context for incremental improvements
-                context_text = self._build_context_text()
+                # Add ER and mentions to context for selection-based edits
+                er_text = self._get_er_text()
+                mentions_text = self._get_mentions_text()
+                base = self._build_context_text()
+                parts = [p for p in [base, er_text, mentions_text] if p]
+                context_text = "\n".join(parts)
                 if context_text:
                     ai_prompt += f"\nCONTEXT:\n{context_text}\n"
                 # Call AI
@@ -1132,6 +1316,11 @@ Return only the improved query, no explanations, code fences, or extra symbols.
                     'old_start': sel_start,
                     'old_end': sel_end
                 })
+                # Also show quick actions for convenience
+                try:
+                    self._create_inline_actions_bar(ai_sql_clean)
+                except Exception:
+                    pass
                 self.input_entry.configure(state="normal")
                 self.input_var.set("")
                 if hasattr(self, 'chat_text'):
@@ -1156,10 +1345,16 @@ Return only the improved query, no explanations, code fences, or extra symbols.
                     schema = {"database_name": self.db_manager.current_db, "tables": table_schemas, "relationships": []}
                 except Exception as e:
                     print(f"Schema extraction error: {e}")
-            # If empty prompt, start a draft using context and schema
+            # If empty prompt, start a draft using context (incl. full file) and schema
             if not prompt_text:
                 banner = "🧠 Starting a new query draft...\n\n"
-                context_text = self._build_context_text()
+                file_ctx = self._get_file_context_snippet()
+                context_base = self._build_context_text()
+                er_text = self._get_er_text()
+                mentions_text = self._get_mentions_text()
+                convention = self._get_mention_convention_text()
+                parts = [p for p in [context_base, er_text, mentions_text, convention, file_ctx] if p]
+                context_text = "\n".join(parts)
                 ai_prompt = f"""
 Generate a relevant starter SQL query for this database. Use context if helpful.
 
@@ -1189,18 +1384,30 @@ Return only the SQL, no explanations or code fences.
                     return
                 merged = f"{banner}{ai_sql_clean}\n"
                 self.add_chat_message("assistant", merged)
+                # Explicitly add compact Keep/Reject
+                try:
+                    self._add_suggestion_block("", ai_sql_clean)
+                except Exception:
+                    pass
                 self.input_entry.configure(state="normal")
                 self.input_var.set("")
                 if hasattr(self, 'chat_text'):
                     self.chat_text.see('end')
                 return
-            # If non-SQL prompt but have context, continue predictively
-            if not self._looks_like_sql(prompt_text) and self.session_context:
-                context_text = self._build_context_text()
+            # If non-SQL prompt, convert natural language to SQL (use full file as context too)
+            if not self._looks_like_sql(prompt_text):
+                file_ctx = self._get_file_context_snippet()
+                context_base = self._build_context_text()
+                er_text = self._get_er_text()
+                mentions_text = self._get_mentions_text()
+                convention = self._get_mention_convention_text()
+                parts = [p for p in [context_base, er_text, mentions_text, convention, file_ctx] if p]
+                context_text = "\n".join(parts)
+                norm_instruction = self._normalize_mentions(prompt_text)
                 ai_prompt = f"""
-Modify or extend the previous SQL based on this instruction:
+Modify or extend the previous SQL based on this instruction (mentions already normalized as [[TABLE:]] and {{COLUMN:}}):
 
-INSTRUCTION: {prompt_text}
+INSTRUCTION: {norm_instruction}
 
 CONTEXT:
 {context_text}
@@ -1223,24 +1430,20 @@ Return only the final SQL, no explanations or code fences.
                     self.input_var.set("")
                     return
                 ai_sql_clean = self._clean_sql_display(ai_sql)
-                if not self._looks_like_sql(ai_sql_clean):
-                    self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
-                    self.input_entry.configure(state="normal")
-                    self.input_var.set("")
-                    return
                 self.add_chat_message("assistant", ai_sql_clean)
+                # Explicitly add compact Keep/Reject
+                try:
+                    self._add_suggestion_block("", ai_sql_clean)
+                except Exception:
+                    pass
                 self.input_entry.configure(state="normal")
                 self.input_var.set("")
                 if hasattr(self, 'chat_text'):
                     self.chat_text.see('end')
                 return
-            # Otherwise require SQL intent as before
-            if not self._looks_like_sql(prompt_text):
-                self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
-                self.input_entry.configure(state="normal")
-                self.input_var.set("")
-                return
-            enhanced_prompt = f"""Generate a complete, executable SQL query for: {prompt_text}
+            # Otherwise, treat as direct SQL text and refine
+            norm_request = self._normalize_mentions(prompt_text)
+            enhanced_prompt = f"""Generate a complete, executable SQL query for: {norm_request}
 
 Requirements:
 - Return ONLY the SQL query, no explanations
@@ -1248,8 +1451,14 @@ Requirements:
 - Use proper SQLite syntax
 {f"- Database context: {self.db_manager.current_db}" if self.db_manager and self.db_manager.current_db else ""}
 """
-            # Include context for continuity even in plain mode
-            context_text = self._build_context_text()
+            # Include context for continuity even in plain mode (and include full file)
+            file_ctx = self._get_file_context_snippet()
+            er_text = self._get_er_text()
+            mentions_text = self._get_mentions_text()
+            context_base = self._build_context_text()
+            convention = self._get_mention_convention_text()
+            parts = [p for p in [context_base, er_text, mentions_text, convention, file_ctx] if p]
+            context_text = "\n".join(parts)
             if context_text:
                 enhanced_prompt += f"\nCONTEXT:\n{context_text}\n"
             ai_sql = None
@@ -1273,8 +1482,12 @@ Requirements:
                 self.input_entry.configure(state="normal")
                 self.input_var.set("")
                 return
-            # Plain generated SQL: show single assistant line only (no suggestion block)
+            # Plain generated SQL: show line and explicit compact Keep/Reject
             self.add_chat_message("assistant", ai_sql_clean)
+            try:
+                self._add_suggestion_block("", ai_sql_clean)
+            except Exception:
+                pass
             self.input_entry.configure(state="normal")
             self.input_var.set("")
             if hasattr(self, 'chat_text'):
@@ -1300,20 +1513,9 @@ Requirements:
     def insert_at_cursor(self, sql):
         """Insert SQL at the current cursor position with proper spacing."""
         cursor_pos = self.sql_editor.editor.index(tk.INSERT)
-        
-        # Add a newline before the SQL if not at the beginning of a line
-        line_start = f"{cursor_pos.split('.')[0]}.0"
-        line_content = self.sql_editor.editor.get(line_start, cursor_pos)
-        if line_content.strip():  # If there's content on the current line
-            sql = "\n" + sql
-        
-        # Add a newline after the SQL
-        sql = sql + "\n"
-        
-        self.sql_editor.editor.insert(cursor_pos, sql)
-        
-        # Highlight the inserted text
-        new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(sql)}c")
+        text = self._compute_gapped_text(cursor_pos, sql)
+        self.sql_editor.editor.insert(cursor_pos, text)
+        new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
         self.highlight_replaced_text(cursor_pos, new_end)
     
     # Removed is_query_complete - no longer needed, we let the AI return what it can
@@ -1332,7 +1534,13 @@ Requirements:
             self.sql_editor.editor.tag_add("ai_replaced", start_pos, end_pos)
             
             # Auto-remove highlight after 5 seconds
-            self.modal_window.after(5000, lambda: self.remove_highlight("ai_replaced"))
+            try:
+                if self.modal_window and self.modal_window.winfo_exists():
+                    self.modal_window.after(5000, lambda: self.remove_highlight("ai_replaced"))
+                else:
+                    self.sql_editor.editor.after(5000, lambda: self.remove_highlight("ai_replaced"))
+            except Exception:
+                self.sql_editor.editor.after(5000, lambda: self.remove_highlight("ai_replaced"))
             
         except Exception as e:
             print(f"Error highlighting text: {e}")
@@ -1351,7 +1559,13 @@ Requirements:
             self.sql_editor.editor.tag_add("ai_selected", start_pos, end_pos)
             
             # Auto-remove highlight after 3 seconds
-            self.modal_window.after(3000, lambda: self.remove_highlight("ai_selected"))
+            try:
+                if self.modal_window and self.modal_window.winfo_exists():
+                    self.modal_window.after(3000, lambda: self.remove_highlight("ai_selected"))
+                else:
+                    self.sql_editor.editor.after(3000, lambda: self.remove_highlight("ai_selected"))
+            except Exception:
+                self.sql_editor.editor.after(3000, lambda: self.remove_highlight("ai_selected"))
             
         except Exception as e:
             print(f"Error highlighting selected text: {e}")
@@ -1387,8 +1601,6 @@ Requirements:
         try:
             # Add proper spacing to SQL
             sql = sql.strip()
-            if not sql.endswith('\n'):
-                sql = sql + '\n'
             
             # Check if there's a selection
             if self.sql_editor.editor.tag_ranges(tk.SEL):
@@ -1399,28 +1611,31 @@ Requirements:
                 # Replace the selected text
                 self.sql_editor.editor.delete(tk.SEL_FIRST, tk.SEL_LAST)
                 insert_pos = self.sql_editor.editor.index(tk.INSERT)
-                self.sql_editor.editor.insert(tk.INSERT, sql)
+                text = self._compute_gapped_text(insert_pos, sql)
+                self.sql_editor.editor.insert(tk.INSERT, text)
                 
                 # Calculate new end position after insertion
-                new_end = self.sql_editor.editor.index(f"{insert_pos}+{len(sql)}c")
+                new_end = self.sql_editor.editor.index(f"{insert_pos}+{len(text)}c")
                 
                 # Highlight the replaced text with a different color
                 self.highlight_replaced_text(insert_pos, new_end)
             else:
                 # No selection, insert at cursor position
                 cursor_pos = self.sql_editor.editor.index(tk.INSERT)
-                self.sql_editor.editor.insert(cursor_pos, sql)
+                text = self._compute_gapped_text(cursor_pos, sql)
+                self.sql_editor.editor.insert(cursor_pos, text)
                 
                 # Highlight the inserted text
-                new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(sql)}c")
+                new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
                 self.highlight_replaced_text(cursor_pos, new_end)
         except tk.TclError:
             # Fallback: insert at cursor position
             cursor_pos = self.sql_editor.editor.index(tk.INSERT)
-            self.sql_editor.editor.insert(cursor_pos, sql)
+            text = self._compute_gapped_text(cursor_pos, sql)
+            self.sql_editor.editor.insert(cursor_pos, text)
             
             # Highlight the inserted text
-            new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(sql)}c")
+            new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
             self.highlight_replaced_text(cursor_pos, new_end)
         
     # Old popup methods removed - now using inline chat interface
@@ -1615,6 +1830,89 @@ Requirements:
             return "\n".join(lines[-self._max_context_items:])
         except Exception:
             return ""
+
+    def _get_file_context_snippet(self) -> str:
+        """Return a trimmed CURRENT_FILE section from the editor, or empty string if unavailable."""
+        try:
+            if not hasattr(self.sql_editor, 'editor'):
+                return ""
+            text = (self.sql_editor.editor.get("1.0", tk.END) or '').strip()
+            if not text:
+                return ""
+            max_chars = 4000
+            snippet = text if len(text) <= max_chars else text[:max_chars] + "\n..."
+            return "CURRENT_FILE:\n" + snippet
+        except Exception:
+            return ""
+
+    def _get_er_text(self) -> str:
+        """Return ER relationships from the current DB as readable lines."""
+        try:
+            if not self.db_manager or not self.db_manager.current_db:
+                return ""
+            tables = self.db_manager.get_tables()
+            rels = []
+            for t in tables:
+                try:
+                    # Use SQLite pragma to list foreign keys
+                    self.db_manager.cursor.execute(f"PRAGMA foreign_key_list({t})")
+                    for fk in self.db_manager.cursor.fetchall():
+                        # fk: (id, seq, table, from, to, on_update, on_delete, match)
+                        rels.append((t, fk[3], fk[2], fk[4]))
+                except Exception:
+                    continue
+            if not rels:
+                return ""
+            lines = ["ER (Foreign Keys):"]
+            for fr_table, fr_col, to_table, to_col in rels:
+                lines.append(f"  - {fr_table}.{fr_col} -> {to_table}.{to_col}")
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _get_mentions_text(self) -> str:
+        """Explain @table and #table:column mentions detected in the current input."""
+        try:
+            text = (self.input_var.get() or "").strip()
+            if not text:
+                return ""
+            mentions = []
+            # @table tokens (letters, numbers, underscores)
+            for m in re.findall(r"@([A-Za-z0-9_]+)", text):
+                mentions.append(f"@{m} means table '{m}'")
+            # #table:column tokens
+            for m in re.findall(r"#([A-Za-z0-9_]+):([A-Za-z0-9_]+)", text):
+                tbl, col = m
+                mentions.append(f"#{tbl}:{col} means column '{col}' in table '{tbl}'")
+            if not mentions:
+                return ""
+            header = "Mentions:"
+            return header + "\n" + "\n".join(["  - " + s for s in mentions])
+        except Exception:
+            return ""
+
+    def _get_mention_convention_text(self) -> str:
+        try:
+            return (
+                "Convention for database references:\n"
+                "  - Tables are written as [[TABLE:name]]\n"
+                "  - Columns are written as {{COLUMN:table.column}}\n"
+                "Please respect these tags when generating SQL."
+            )
+        except Exception:
+            return ""
+
+    def _normalize_mentions(self, text: str) -> str:
+        try:
+            if not text:
+                return text
+            # Columns first: #table:column -> {{COLUMN:table.column}}
+            text = re.sub(r"#([A-Za-z0-9_]+):([A-Za-z0-9_]+)", r"{{COLUMN:\1.\2}}", text)
+            # Tables next: @table -> [[TABLE:table]]
+            text = re.sub(r"@([A-Za-z0-9_]+)", r"[[TABLE:\1]]", text)
+            return text
+        except Exception:
+            return text
 
     def _add_suggestion_block(self, old_code, new_code, old_start=None, old_end=None):
         """Render a suggestion block using existing chat insertion. OLD may be empty."""
