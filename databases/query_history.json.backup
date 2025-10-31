@@ -1,76 +1,6 @@
 [
   {
     "query": "SELECT DISTINCT emp_id FROM Salaries WHERE amount > 50000",
-    "timestamp": "2025-10-30T00:09:08.323408",
-    "status": "success",
-    "database": "ascds",
-    "id": 1
-  },
-  {
-    "query": "SELECT DISTINCT emp_id FROM Salaries WHERE amount > 50000",
-    "timestamp": "2025-10-30T00:09:08.325412",
-    "status": "success",
-    "database": "ascds",
-    "id": 2
-  },
-  {
-    "query": "SELECT DISTINCT emp_id FROM Salaries WHERE amount > 50000",
-    "timestamp": "2025-10-30T00:09:15.518040",
-    "status": "success",
-    "database": "ascds",
-    "id": 3
-  },
-  {
-    "query": "SELECT DISTINCT emp_id FROM Salaries WHERE amount > 50000",
-    "timestamp": "2025-10-30T00:09:15.521552",
-    "status": "success",
-    "database": "ascds",
-    "id": 4
-  },
-  {
-    "query": "Show employees with salary > 50000",
-    "timestamp": "2025-10-30T00:09:28.468813",
-    "status": "error: near \"Show\": syntax error",
-    "database": "ascds",
-    "id": 5
-  },
-  {
-    "query": "-- Current Database: ascds\n-- Ready to execute SQL queries\n\nShow employees with salary > 50000",
-    "timestamp": "2025-10-30T00:09:28.472657",
-    "status": "success",
-    "database": "ascds",
-    "id": 6
-  },
-  {
-    "query": "SELECT DISTINCT emp_id FROM Salaries WHERE amount > 50000",
-    "timestamp": "2025-10-30T00:09:59.742284",
-    "status": "success",
-    "database": "ascds",
-    "id": 7
-  },
-  {
-    "query": "SELECT DISTINCT emp_id FROM Salaries WHERE amount > 50000",
-    "timestamp": "2025-10-30T00:09:59.746438",
-    "status": "success",
-    "database": "ascds",
-    "id": 8
-  },
-  {
-    "query": "SELECT DISTINCT emp_id FROM Salaries WHERE amount > 50000",
-    "timestamp": "2025-10-30T00:11:13.989955",
-    "status": "success",
-    "database": "ascds",
-    "id": 9
-  },
-  {
-    "query": "SELECT DISTINCT emp_id FROM Salaries WHERE amount > 50000;",
-    "timestamp": "2025-10-30T00:11:13.992936",
-    "status": "success",
-    "database": "ascds",
-    "id": 10
-  },
-  {
-    "query": "SELECT DISTINCT emp_id FROM Salaries WHERE amount > 50000",
     "timestamp": "2025-10-30T00:11:15.038814",
     "status": "success",
     "database": "ascds",
@@ -390,5 +320,383 @@
     "status": "success",
     "database": "ascds",
     "id": 56
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:45.854588",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 57
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:45.862941",
+    "status": "success",
+    "database": "company",
+    "id": 58
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:48.202292",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 59
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:48.211594",
+    "status": "success",
+    "database": "company",
+    "id": 60
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:49.250102",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 61
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:49.256674",
+    "status": "success",
+    "database": "company",
+    "id": 62
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:49.980961",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 63
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:49.989294",
+    "status": "success",
+    "database": "company",
+    "id": 64
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:50.597510",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 65
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:50.597510",
+    "status": "success",
+    "database": "company",
+    "id": 66
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:50.776172",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 67
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:50.778692",
+    "status": "success",
+    "database": "company",
+    "id": 68
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:50.968906",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 69
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:50.975962",
+    "status": "success",
+    "database": "company",
+    "id": 70
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.155591",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 71
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.158678",
+    "status": "success",
+    "database": "company",
+    "id": 72
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.342063",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 73
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.346916",
+    "status": "success",
+    "database": "company",
+    "id": 74
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.527602",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 75
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.536244",
+    "status": "success",
+    "database": "company",
+    "id": 76
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.720498",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 77
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.725721",
+    "status": "success",
+    "database": "company",
+    "id": 78
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.905303",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 79
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:51.913403",
+    "status": "success",
+    "database": "company",
+    "id": 80
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.092697",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 81
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.100042",
+    "status": "success",
+    "database": "company",
+    "id": 82
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.281130",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 83
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.289544",
+    "status": "success",
+    "database": "company",
+    "id": 84
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.464351",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 85
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.477820",
+    "status": "success",
+    "database": "company",
+    "id": 86
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.653096",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 87
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.661608",
+    "status": "success",
+    "database": "company",
+    "id": 88
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.844813",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 89
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:52.853711",
+    "status": "success",
+    "database": "company",
+    "id": 90
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.035527",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 91
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.045123",
+    "status": "success",
+    "database": "company",
+    "id": 92
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.231979",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 93
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.241641",
+    "status": "success",
+    "database": "company",
+    "id": 94
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.405983",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 95
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.419430",
+    "status": "success",
+    "database": "company",
+    "id": 96
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.588757",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 97
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.595169",
+    "status": "success",
+    "database": "company",
+    "id": 98
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.768371",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 99
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.778432",
+    "status": "success",
+    "database": "company",
+    "id": 100
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.975325",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 101
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:53.983567",
+    "status": "success",
+    "database": "company",
+    "id": 101
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:54.149600",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 101
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:54.158093",
+    "status": "success",
+    "database": "company",
+    "id": 101
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:54.341688",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 101
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:54.350002",
+    "status": "success",
+    "database": "company",
+    "id": 101
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:54.522672",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 101
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:54.530824",
+    "status": "success",
+    "database": "company",
+    "id": 101
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:54.714209",
+    "status": "error: near \"sadsad\": syntax error",
+    "database": "company",
+    "id": 101
+  },
+  {
+    "query": "sadsad",
+    "timestamp": "2025-10-31T22:08:54.721854",
+    "status": "success",
+    "database": "company",
+    "id": 101
   }
 ]

@@ -24,8 +24,8 @@ class DBMSWorkbench(ttk.Window):
         # Initialize Settings Manager first
         self.settings_manager = SettingsManager()
         
-        # Get theme from settings
-        initial_theme = self.settings_manager.get_theme()
+        # Force light theme (white mode)
+        initial_theme = "flatly"  # Always use light theme
         super().__init__(themename=initial_theme)
         self.title("MariaDB:Aries Version - SQL Compiler")
         
@@ -62,14 +62,14 @@ class DBMSWorkbench(ttk.Window):
         session_storage_path = os.path.join(os.getcwd(), "sessions")
         self.session_manager = SessionManager(session_storage_path)
         
-        # Theme variable - load from settings
-        self.current_theme = self.settings_manager.get_theme()
+        # Theme variable - force light theme
+        self.current_theme = "flatly"
 
         self.create_ui()
 
     def create_ui(self):
-        # Create vertical header bar
-        self.create_header_bar()
+        # Create menu bar
+        self.create_menu_bar()
         
         # Create main notebook for all tabs with modern styling
         self.main_notebook = ttk.Notebook(self, style="Modern.TNotebook")
@@ -135,7 +135,7 @@ class DBMSWorkbench(ttk.Window):
         self.settings_tab = ttk.Frame(self.main_notebook)
         self.main_notebook.add(self.settings_tab, text="⚙️ Settings")
         self.settings_panel = SettingsPanel(self.settings_tab, self.settings_manager, 
-                                           self.on_theme_changed, self.on_api_key_changed)
+                                           None, self.on_api_key_changed)
         self.settings_panel.pack(fill=tk.BOTH, expand=True)
         
         
@@ -148,6 +148,21 @@ class DBMSWorkbench(ttk.Window):
         
         # Bind tab change event
         self.main_notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+        
+        # Bind keyboard shortcuts
+        self.bind("<Control-r>", lambda event: self.sql_editor.run_query())
+        self.bind("<Control-c>", lambda event: self.sql_editor.clear_editor())
+        self.bind("<Control-g>", lambda event: self.sql_editor.generate_sql())
+        self.bind("<Control-Shift-a>", lambda event: self.sql_editor.show_horizontal_ai_modal())
+        self.bind("<Control-f>", lambda event: self.search_sql())
+        
+        # Tab switching shortcuts
+        self.bind("<Control-1>", lambda event: self.main_notebook.select(0))  # SQL Editor
+        self.bind("<Control-2>", lambda event: self.main_notebook.select(1))  # Query Builder
+        self.bind("<Control-3>", lambda event: self.main_notebook.select(2))  # History
+        self.bind("<Control-4>", lambda event: self.main_notebook.select(3))  # Favorites
+        self.bind("<Control-5>", lambda event: self.main_notebook.select(4))  # Schema
+        self.bind("<Control-6>", lambda event: self.main_notebook.select(5))  # Settings
     
     def on_theme_changed(self, theme: str):
         """Handle theme change from settings."""
@@ -185,9 +200,9 @@ class DBMSWorkbench(ttk.Window):
         # Favorites list
         favorites_list = tk.Listbox(content_frame, 
                                    font=("Consolas", 11),
-                                   bg="#2d2d2d", fg="#ffffff",
-                                   selectbackground="#404040", selectforeground="#ffffff",
-                                   relief="flat", bd=1)
+                                   bg="#ffffff", fg="#333333",
+                                   selectbackground="#cce5ff", selectforeground="#000000",
+                                   relief="solid", bd=1)
         favorites_list.pack(fill=tk.BOTH, expand=True)
         
         # Add some sample favorites
@@ -213,107 +228,87 @@ class DBMSWorkbench(ttk.Window):
         
         favorites_list.bind("<Double-1>", on_favorite_double_click)
 
-    def create_header_bar(self):
-        """Create horizontal header bar with emoji icons, tooltips, and names."""
-        # Create header frame
-        self.header_frame = ttk.Frame(self, style="Header.TFrame")
-        self.header_frame.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
+    def create_menu_bar(self):
+        """Create menu bar with File, Info, Help menus."""
+        menubar = tk.Menu(self)
+        self.config(menu=menubar)
         
-        # Configure header style
-        style = ttk.Style()
-        style.configure("Header.TFrame", background="#f8f9fa", relief="raised", borderwidth=1)
+        # File menu
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="New Database", command=self.show_create_database_modal)
+        file_menu.add_command(label="Open Database", command=self.open_database_quick)
+        file_menu.add_separator()
+        file_menu.add_command(label="Save Session", command=self.save_session)
+        file_menu.add_command(label="Load Session", command=self.load_session)
+        file_menu.add_separator()
+        file_menu.add_command(label="Backup Database", command=self.backup_database)
+        file_menu.add_command(label="Restore Database", command=self.restore_database)
+        file_menu.add_separator()
+        file_menu.add_command(label="Export Data", command=self.export_data)
+        file_menu.add_command(label="Import Data", command=self.import_data)
+        file_menu.add_separator()
+        file_menu.add_command(label="Settings", command=self.show_settings, accelerator="Ctrl+,")
         
-        # Create main container for buttons and labels
-        main_container = ttk.Frame(self.header_frame)
-        main_container.pack(fill=tk.X, padx=5, pady=5)
+        # Database menu
+        database_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Database", menu=database_menu)
+        database_menu.add_command(label="Create Database", command=self.show_create_database_modal)
+        database_menu.add_command(label="Open Database", command=self.open_database_quick)
+        database_menu.add_separator()
+        database_menu.add_command(label="Create Table", command=self.show_create_table_modal)
+        database_menu.add_command(label="Create View", command=self.show_create_view_modal)
+        database_menu.add_command(label="Create Trigger", command=self.show_create_trigger_modal)
+        database_menu.add_command(label="Create Function", command=self.show_create_function_modal)
+        database_menu.add_separator()
+        database_menu.add_command(label="Refresh Schema", command=self.refresh_schema)
+        database_menu.add_command(label="Show Statistics", command=self.show_statistics)
         
-        # Create horizontal button bar
-        button_frame = ttk.Frame(main_container)
-        button_frame.pack(fill=tk.X)
+        # SQL menu
+        sql_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="SQL", menu=sql_menu)
+        sql_menu.add_command(label="Run Query", command=self.run_sql, accelerator="Ctrl+R")
+        sql_menu.add_command(label="Clear Editor", command=self.clear_sql, accelerator="Ctrl+C")
+        sql_menu.add_separator()
+        sql_menu.add_command(label="AI Generate", command=self.generate_sql, accelerator="Ctrl+G")
+        sql_menu.add_command(label="AI Chat", command=lambda: self.sql_editor.show_horizontal_ai_modal(), accelerator="Ctrl+Shift+A")
+        sql_menu.add_separator()
+        sql_menu.add_command(label="Copy SQL", command=self.copy_sql)
+        sql_menu.add_command(label="Search in SQL", command=self.search_sql, accelerator="Ctrl+F")
         
-        # Database operations
-        self.create_button_with_label(button_frame, "🗄️", "Create DB", self.show_create_database_modal, "Create Database")
-        self.create_button_with_label(button_frame, "📂", "Open DB", self.open_database_quick, "Open Database")
-        self.create_button_with_label(button_frame, "💾", "Backup", self.backup_database, "Backup Database")
-        self.create_button_with_label(button_frame, "🔄", "Refresh", self.refresh_schema, "Refresh Schema")
+        # Tools menu
+        tools_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="Query Builder", command=self.show_query_builder)
+        tools_menu.add_command(label="Schema Visualizer", command=self.show_schema_visualizer)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Query History", command=self.show_query_history)
+        tools_menu.add_command(label="Save Query History", command=self.save_query_history)
+        tools_menu.add_command(label="Show Query Statistics", command=self.show_query_stats)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Clear Query History", command=self.clear_query_history)
         
-        # Separator
-        ttk.Separator(button_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        # View menu
+        view_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="View", menu=view_menu)
+        view_menu.add_command(label="Toggle Theme", command=self.toggle_theme)
+        view_menu.add_separator()
+        view_menu.add_command(label="Refresh Data", command=self.refresh_data)
         
-        # SQL operations
-        self.create_button_with_label(button_frame, "▶️", "Run", self.run_sql, "Run SQL (Ctrl+R)")
-        self.create_button_with_label(button_frame, "🧹", "Clear", self.clear_sql, "Clear Editor (Ctrl+C)")
-        self.create_button_with_label(button_frame, "🤖", "AI Gen", self.generate_sql, "AI Generate (Ctrl+G)")
-        self.create_button_with_label(button_frame, "📋", "Copy", self.copy_sql, "Copy SQL")
+        # Info menu
+        info_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Info", menu=info_menu)
+        info_menu.add_command(label="About", command=self.show_about)
+        info_menu.add_command(label="Show Statistics", command=self.show_statistics)
+        info_menu.add_command(label="Query Statistics", command=self.show_query_stats)
         
-        # Separator
-        ttk.Separator(button_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
-        
-        # Query Builder
-        self.create_button_with_label(button_frame, "🔧", "Builder", self.show_query_builder, "Query Builder")
-        self.create_button_with_label(button_frame, "📊", "Schema", self.show_schema_visualizer, "Schema Visualizer")
-        self.create_button_with_label(button_frame, "📜", "History", self.show_query_history, "Query History")
-        self.create_button_with_label(button_frame, "🔍", "Search", self.search_sql, "Search in SQL")
-        
-        # Separator
-        ttk.Separator(button_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
-        
-        # Data operations
-        self.create_button_with_label(button_frame, "📤", "Export", self.export_data, "Export Data")
-        self.create_button_with_label(button_frame, "📥", "Import", self.import_data, "Import Data")
-        self.create_button_with_label(button_frame, "📋", "Copy", self.copy_results, "Copy Results")
-        self.create_button_with_label(button_frame, "🔄", "Refresh", self.refresh_data, "Refresh Data")
-        
-        # Separator
-        ttk.Separator(button_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
-        
-        
-        # Advanced features
-        self.create_button_with_label(button_frame, "⚡", "Trigger", self.show_create_trigger_modal, "Create Trigger")
-        self.create_button_with_label(button_frame, "🔧", "Function", self.show_create_function_modal, "Create Function")
-        self.create_button_with_label(button_frame, "👁️", "View", self.show_create_view_modal, "Create View")
-        self.create_button_with_label(button_frame, "📈", "Stats", self.show_statistics, "Show Statistics")
-        
-        # Separator
-        ttk.Separator(button_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
-        
-        # History management
-        self.create_button_with_label(button_frame, "💾", "Save", self.save_query_history, "Save Query History")
-        self.create_button_with_label(button_frame, "📊", "Stats", self.show_query_stats, "Show Query Statistics")
-        
-        # Separator
-        ttk.Separator(button_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
-        
-        # Settings
-        self.create_button_with_label(button_frame, "🌙", "Theme", self.toggle_theme, "Toggle Theme")
-        self.create_button_with_label(button_frame, "⚙️", "Settings", self.show_settings, "Settings")
-        self.create_button_with_label(button_frame, "❓", "Help", self.show_help, "Help")
-        self.create_button_with_label(button_frame, "ℹ️", "About", self.show_about, "About")
-
-    def create_button_with_label(self, parent, emoji, name, command, tooltip_text):
-        """Create a button with emoji, name label, and tooltip."""
-        # Create container for button and label
-        container = ttk.Frame(parent)
-        container.pack(side=tk.LEFT, padx=4, pady=3)
-        
-        # Create button with better styling
-        button = tk.Button(container, text=emoji, command=command,
-                          bg="#404040", fg="#ffffff", bd=0,
-                          font=("Arial", 12), width=4, height=1,
-                          activebackground="#007acc", activeforeground="#ffffff",
-                          relief="flat")
-        button.pack(pady=(0, 2))
-        
-        # Create label below button
-        label = ttk.Label(container, text=name, font=("Arial", 8), 
-                         style="Info.TLabel")
-        label.pack()
-        
-        # Add tooltip
-        create_improved_tooltip(button, tooltip_text)
-        create_improved_tooltip(label, tooltip_text)
-        
-        return button
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="Help", command=self.show_help)
+        help_menu.add_command(label="Keyboard Shortcuts", command=self.show_help)
+        help_menu.add_separator()
+        help_menu.add_command(label="About", command=self.show_about)
     
     def save_query_history(self):
         """Manually save query history."""
@@ -381,53 +376,6 @@ Recent Queries:
         """Show modern create trigger modal."""
         if self.modern_modals:
             self.modern_modals.show_create_trigger_modal()
-    
-        
-        # Create menu bar for theme toggle and other options
-        menubar = tk.Menu(self)
-        self.config(menu=menubar)
-        
-        # File menu
-        file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Save Session", command=self.save_session)
-        file_menu.add_command(label="Load Session", command=self.load_session)
-        file_menu.add_separator()
-        file_menu.add_command(label="Backup Database", command=self.backup_database)
-        file_menu.add_command(label="Restore Database", command=self.restore_database)
-        file_menu.add_separator()
-        file_menu.add_command(label="Export Data", command=self.export_data)
-        file_menu.add_command(label="Import Data", command=self.import_data)
-        
-        # View menu
-        view_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="View", menu=view_menu)
-        view_menu.add_command(label="Toggle Theme (Dark/Light)", command=self.toggle_theme)
-        view_menu.add_separator()
-        view_menu.add_command(label="Refresh Schema", command=self.refresh_schema)
-        view_menu.add_command(label="Show Query History", command=self.show_query_history)
-        
-        # Tools menu
-        tools_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Tools", menu=tools_menu)
-        tools_menu.add_command(label="Query Builder", command=self.show_query_builder)
-        tools_menu.add_command(label="Schema Visualizer", command=self.show_schema_visualizer)
-        tools_menu.add_separator()
-        tools_menu.add_command(label="Clear Query History", command=self.clear_query_history)
-        
-        # Bind keyboard shortcuts
-        self.bind("<Control-r>", lambda event: self.sql_editor.run_query())
-        self.bind("<Control-c>", lambda event: self.sql_editor.clear_editor())
-        self.bind("<Control-g>", lambda event: self.sql_editor.generate_sql())
-        self.bind("<Control-Shift-a>", lambda event: self.sql_editor.show_horizontal_ai_modal())
-        
-        # Tab switching shortcuts
-        self.bind("<Control-1>", lambda event: self.main_notebook.select(0))  # SQL Editor
-        self.bind("<Control-2>", lambda event: self.main_notebook.select(1))  # Query Builder
-        self.bind("<Control-3>", lambda event: self.main_notebook.select(2))  # History
-        self.bind("<Control-4>", lambda event: self.main_notebook.select(3))  # Favorites
-        self.bind("<Control-5>", lambda event: self.main_notebook.select(4))  # Schema
-        self.bind("<Control-6>", lambda event: self.main_notebook.select(5))  # Settings
 
     def toggle_theme(self):
         """Toggle between light and dark themes."""

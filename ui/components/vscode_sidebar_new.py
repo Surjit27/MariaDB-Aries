@@ -48,7 +48,7 @@ class VSCodeSidebar:
         # Default empty state
         self.empty_state = ttk.Frame(self.content_container, style="SideNav.TFrame")
         self.empty_state.pack(fill=tk.BOTH, expand=True)
-        empty_label = ttk.Label(self.empty_state, text="Select a tab", font=("Segoe UI", 11, "bold"), foreground="#1a1a1a")
+        empty_label = ttk.Label(self.empty_state, text="Select a tab", font=("Segoe UI", 11, "bold"), foreground="#333333")
         empty_label.pack(expand=True)
     
     def create_tab_bar(self):

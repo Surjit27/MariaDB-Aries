@@ -5,12 +5,11 @@ from typing import Callable, Optional
 from utils.settings_manager import SettingsManager
 
 class SettingsPanel(ttk.Frame):
-    """Settings panel with API key management and theme toggle."""
+    """Settings panel with API key management."""
     
     def __init__(self, parent, settings_manager: SettingsManager, on_theme_changed: Callable = None, on_api_key_changed: Callable = None):
         super().__init__(parent)
         self.settings_manager = settings_manager
-        self.on_theme_changed = on_theme_changed
         self.on_api_key_changed = on_api_key_changed
         self.create_widgets()
         self.refresh_api_keys()
@@ -37,46 +36,12 @@ class SettingsPanel(ttk.Frame):
         title_label = ttk.Label(scrollable_frame, text="⚙️ Settings", 
                                font=("Arial", 16, "bold"))
         title_label.pack(pady=(10, 20))
-
-        # Theme Section
-        self.create_theme_section(scrollable_frame)
         
         # API Keys Section
         self.create_api_keys_section(scrollable_frame)
         
         # General Settings Section
         self.create_general_section(scrollable_frame)
-    
-    def create_theme_section(self, parent):
-        """Create theme selection section."""
-        theme_frame = ttk.LabelFrame(parent, text="🎨 Theme", padding=10)
-        theme_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        # Current theme display
-        current_theme = self.settings_manager.get_theme()
-        theme_label = ttk.Label(theme_frame, text=f"Current Theme: {current_theme.title()}", 
-                               font=("Arial", 10))
-        theme_label.pack(anchor=tk.W, pady=(0, 10))
-        
-        # Theme selection buttons
-        theme_buttons_frame = ttk.Frame(theme_frame)
-        theme_buttons_frame.pack(fill=tk.X)
-        
-        # Dark theme button
-        dark_btn = ttk.Button(theme_buttons_frame, text="🌙 Dark Mode", 
-                             command=lambda: self.change_theme("darkly"))
-        dark_btn.pack(side=tk.LEFT, padx=(0, 10))
-        
-        # Light theme button
-        light_btn = ttk.Button(theme_buttons_frame, text="☀️ Light Mode", 
-                              command=lambda: self.change_theme("flatly"))
-        light_btn.pack(side=tk.LEFT)
-        
-        # Highlight current theme
-        if current_theme == "darkly":
-            dark_btn.configure(style="Accent.TButton")
-        else:
-            light_btn.configure(style="Accent.TButton")
     
     def create_api_keys_section(self, parent):
         """Create API keys management section."""
@@ -158,22 +123,6 @@ class SettingsPanel(ttk.Frame):
                                variable=self.ai_autocomplete_var,
                                command=self.toggle_ai_autocomplete)
         ai_cb.pack(anchor=tk.W, pady=2)
-    
-    def change_theme(self, theme: str):
-        """Change application theme."""
-        if self.settings_manager.set_theme(theme):
-            if self.on_theme_changed:
-                self.on_theme_changed(theme)
-            messagebox.showinfo("Success", f"Theme changed to {theme.title()}")
-            # Refresh the theme section to highlight current theme
-            self.refresh_theme_section()
-        else:
-            messagebox.showerror("Error", "Failed to change theme")
-    
-    def refresh_theme_section(self):
-        """Refresh theme section to show current selection."""
-        # This would require recreating the theme section or updating button styles
-        pass
     
     def add_api_key(self):
         """Add a new API key."""

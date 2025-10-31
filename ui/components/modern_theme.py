@@ -9,98 +9,98 @@ class ModernTheme:
         
     def setup_modern_theme(self):
         """Setup the modern MariaDB:Aries theme."""
-        # Create custom dark theme
-        self.style.theme_use("darkly")
+        # Use light theme (white mode)
+        self.style.theme_use("flatly")
         
         # Configure main window
         self.style.configure("Main.TFrame", 
-                           background="#1a1a1a", 
+                           background="#ffffff", 
                            relief="flat")
         
         # Configure side navigation
         self.style.configure("SideNav.TFrame", 
-                           background="#1e1e1e", 
+                           background="#f8f9fa", 
                            relief="flat",
                            borderwidth=0)
         
         # Configure navigation buttons
         self.style.configure("Nav.TButton",
-                           background="#1e1e1e",
-                           foreground="#ffffff",
+                           background="#f8f9fa",
+                           foreground="#333333",
                            borderwidth=0,
                            focuscolor="none",
                            padding=(10, 8))
         
         self.style.map("Nav.TButton",
-                      background=[("active", "#2d2d2d"),
-                                ("pressed", "#404040")])
+                      background=[("active", "#e9ecef"),
+                                ("pressed", "#dee2e6")])
         
         # Configure main content area
         self.style.configure("Content.TFrame",
-                           background="#1a1a1a",
+                           background="#ffffff",
                            relief="flat")
         
         # Configure SQL editor
         self.style.configure("SQL.TFrame",
-                           background="#1a1a1a",
+                           background="#ffffff",
                            relief="flat")
         
         # Configure results viewer
         self.style.configure("Results.TFrame",
-                           background="#1a1a1a",
+                           background="#ffffff",
                            relief="flat")
         
         # Configure header bar
         self.style.configure("Header.TFrame",
-                           background="#2d2d2d",
+                           background="#ffffff",
                            relief="flat",
                            borderwidth=0)
         
         # Configure header buttons
         self.style.configure("Header.TButton",
-                           background="#2d2d2d",
-                           foreground="#ffffff",
+                           background="#ffffff",
+                           foreground="#333333",
                            borderwidth=0,
                            focuscolor="none",
                            padding=(8, 6))
         
         self.style.map("Header.TButton",
-                      background=[("active", "#404040"),
-                                ("pressed", "#555555")])
+                      background=[("active", "#f0f0f0"),
+                                ("pressed", "#e0e0e0")])
         
         # Configure AI prompt
         self.style.configure("AIPrompt.TFrame",
-                           background="#1e1e1e",
+                           background="#f8f9fa",
                            relief="raised",
                            borderwidth=1)
         
         # Configure modals
         self.style.configure("Modal.TFrame",
-                           background="#2d2d2d",
+                           background="#ffffff",
                            relief="raised",
                            borderwidth=2)
         
         # Configure modal buttons
         self.style.configure("Modal.TButton",
-                           background="#404040",
+                           background="#007bff",
                            foreground="#ffffff",
                            borderwidth=0,
                            padding=(12, 8))
         
         self.style.map("Modal.TButton",
-                      background=[("active", "#555555"),
-                                ("pressed", "#666666")])
+                      background=[("active", "#0056b3"),
+                                ("pressed", "#004085")])
         
         # Configure treeview for sidebar
         self.style.configure("Treeview",
-                           background="#1e1e1e",
-                           foreground="#ffffff",
-                           fieldbackground="#1e1e1e",
+                           background="#ffffff",
+                           foreground="#333333",
+                           fieldbackground="#ffffff",
                            borderwidth=0)
         
         self.style.configure("Treeview.Heading",
-                           background="#404040",
-                           foreground="#ffffff",
+                           background="#f8f9fa",
+                           foreground="#333333",
                            borderwidth=0)
         
         # Configure text widgets (using standard Frame style)
@@ -108,74 +108,74 @@ class ModernTheme:
         
         # Configure labels
         self.style.configure("Title.TLabel",
-                           background="#1a1a1a",
-                           foreground="#ffffff",
+                           background="#ffffff",
+                           foreground="#333333",
                            font=("Arial", 14, "bold"))
         
         self.style.configure("Subtitle.TLabel",
-                           background="#1a1a1a",
-                           foreground="#cccccc",
+                           background="#ffffff",
+                           foreground="#666666",
                            font=("Arial", 10))
         
         self.style.configure("Info.TLabel",
-                           background="#1a1a1a",
+                           background="#ffffff",
                            foreground="#888888",
                            font=("Arial", 9))
         
         # Configure entry widgets
         self.style.configure("Modern.TEntry",
-                           background="#404040",
-                           foreground="#ffffff",
+                           background="#ffffff",
+                           foreground="#333333",
                            borderwidth=1,
-                           relief="flat",
-                           fieldbackground="#404040")
+                           relief="solid",
+                           fieldbackground="#ffffff")
         
         # Configure text areas (using standard Text widget)
         # Note: Text widgets don't use ttk styles, they use tkinter styles
         
         # Configure scrollbars
         self.style.configure("Modern.TScrollbar",
-                           background="#2d2d2d",
-                           troughcolor="#1a1a1a",
+                           background="#e0e0e0",
+                           troughcolor="#f8f9fa",
                            borderwidth=0,
-                           arrowcolor="#ffffff",
-                           darkcolor="#2d2d2d",
-                           lightcolor="#2d2d2d")
+                           arrowcolor="#333333",
+                           darkcolor="#e0e0e0",
+                           lightcolor="#e0e0e0")
         
         # Configure separators
         self.style.configure("Modern.TSeparator",
-                           background="#404040")
+                           background="#e0e0e0")
         
         # Configure notebook tabs
         self.style.configure("TNotebook",
-                           background="#1e1e1e",
+                           background="#ffffff",
                            borderwidth=0)
         
         self.style.configure("TNotebook.Tab",
-                           background="#1e1e1e",
-                           foreground="#cccccc",
+                           background="#f8f9fa",
+                           foreground="#333333",
                            borderwidth=0,
                            padding=(12, 8))
         
         self.style.map("TNotebook.Tab",
-                      background=[("selected", "#2d2d2d"),
-                                ("active", "#404040")])
+                      background=[("selected", "#ffffff"),
+                                ("active", "#e9ecef")])
         
         # Modern notebook style
         self.style.configure("Modern.TNotebook",
-                           background="#1e1e1e",
+                           background="#ffffff",
                            borderwidth=0)
         
         self.style.configure("Modern.TNotebook.Tab",
-                           background="#1e1e1e",
-                           foreground="#cccccc",
+                           background="#f8f9fa",
+                           foreground="#333333",
                            borderwidth=0,
                            padding=(12, 8),
                            font=("Consolas", 10))
         
         self.style.map("Modern.TNotebook.Tab",
-                      background=[("selected", "#2d2d2d"),
-                                ("active", "#404040")])
+                      background=[("selected", "#ffffff"),
+                                ("active", "#e9ecef")])
         
         # Configure listbox (using standard Listbox style)
         # Note: Listbox widgets use standard tkinter styling
@@ -194,7 +194,7 @@ class ModernTheme:
         
         # Configure tooltip
         self.style.configure("Tooltip.TLabel",
-                           background="#2d2d2d",
+                           background="#333333",
                            foreground="#ffffff",
                            font=("Arial", 9),
                            relief="raised",
@@ -270,23 +270,23 @@ class ModernTheme:
     def get_color_scheme(self):
         """Get the color scheme for the interface."""
         return {
-            "primary": "#1e1e1e",      # Main background (VS Code dark)
-            "secondary": "#252526",     # Sidebar background
-            "accent": "#2d2d2d",       # Interactive elements
-            "highlight": "#404040",     # Hover states
-            "text_primary": "#cccccc",  # Primary text
-            "text_secondary": "#ffffff", # Secondary text
-            "text_muted": "#888888",   # Muted text
-            "border": "#3c3c3c",       # Border color
-            "success": "#4caf50",      # Success color
-            "warning": "#ff9800",      # Warning color
-            "error": "#f44747",        # Error color
-            "info": "#007acc",         # Info color (VS Code blue)
-            "keyword": "#569cd6",      # SQL keywords
-            "string": "#ce9178",       # String literals
-            "comment": "#6a9955",      # Comments
-            "number": "#b5cea8",       # Numbers
-            "function": "#dcdcaa"      # Functions
+            "primary": "#ffffff",      # Main background (white)
+            "secondary": "#f8f9fa",     # Sidebar background
+            "accent": "#e9ecef",       # Interactive elements
+            "highlight": "#dee2e6",    # Hover states
+            "text_primary": "#333333",  # Primary text
+            "text_secondary": "#212529", # Secondary text
+            "text_muted": "#6c757d",   # Muted text
+            "border": "#dee2e6",       # Border color
+            "success": "#28a745",       # Success color
+            "warning": "#ffc107",       # Warning color
+            "error": "#dc3545",         # Error color
+            "info": "#007bff",          # Info color (bootstrap blue)
+            "keyword": "#0066cc",       # SQL keywords
+            "string": "#cc6600",        # String literals
+            "comment": "#6c757d",      # Comments
+            "number": "#006600",        # Numbers
+            "function": "#0099ff"       # Functions
         }
     
     def apply_modern_theme(self, widget):
