@@ -93,16 +93,26 @@ class HorizontalAIModal:
             return
         self.is_visible = True
 
-        # Detect SQL selection
+        # Detect SQL selection (both selected text and highlighted text)
         self.selection_text = None
         self.selection_mode = False
+        self.is_highlighted_text = False  # Track if it's highlighted vs selected
         try:
-            sel = self.get_selected_text_from_editor()
-            if sel and self._is_valid_sql_selection(sel):
-                self.selection_text = sel
+            # First check for manually highlighted text (Ctrl+/ highlights)
+            highlighted_text = self.get_highlighted_text_from_editor()
+            if highlighted_text:
+                self.selection_text = highlighted_text
                 self.selection_mode = True
+                self.is_highlighted_text = True
             else:
-                self.selection_mode = False # fallback
+                # Fallback to regular selection
+                sel = self.get_selected_text_from_editor()
+                if sel and self._is_valid_sql_selection(sel):
+                    self.selection_text = sel
+                    self.selection_mode = True
+                    self.is_highlighted_text = False
+                else:
+                    self.selection_mode = False # fallback
         except Exception as e:
             print(f"Selection check error: {e}")
             self.selection_mode = False
@@ -165,6 +175,12 @@ class HorizontalAIModal:
                 self.sql_editor.editor.bind("<ButtonRelease-1>", self.on_editor_selection_release, add='+')
             except Exception:
                 pass
+        
+        # Pre-fill input with highlighted/selected text if available
+        if self.selection_text:
+            query_type = "highlighted" if getattr(self, 'is_highlighted_text', False) else "selected"
+            initial_prompt = f"Please help me with this {query_type} query:\n\n{self.selection_text}"
+            self.input_var.set(initial_prompt)
         
         # Focus and select text
         self.input_entry.focus()
@@ -478,6 +494,9 @@ class HorizontalAIModal:
     def handle_keep_suggestion(self, suggestion_data):
         """Handle Keep button click - apply suggestion to editor."""
         try:
+            inserted_start = None
+            inserted_end = None
+            
             if suggestion_data.get('old_start') and suggestion_data.get('old_end'):
                 # Replace existing code
                 old_start = suggestion_data['old_start']
@@ -486,37 +505,49 @@ class HorizontalAIModal:
                 text = self._compute_gapped_text(old_start, suggestion_data['new_code'])
                 self.sql_editor.editor.insert(old_start, text)
                 
-                # Highlight applied code in green
-                new_end = self.sql_editor.editor.index(f"{old_start}+{len(text)}c")
-                self.highlight_applied_code(old_start, new_end)
-                # Tag for undo
-                try:
-                    self.sql_editor.editor.tag_remove("ai_last_insert", "1.0", tk.END)
-                except Exception:
-                    pass
-                self.sql_editor.editor.tag_add("ai_last_insert", old_start, new_end)
-                self._last_ai_insert_range = (old_start, new_end)
+                inserted_start = old_start
+                inserted_end = self.sql_editor.editor.index(f"{old_start}+{len(text)}c")
             else:
                 # Insert at cursor
                 cursor_pos = self.sql_editor.editor.index(tk.INSERT)
                 text = self._compute_gapped_text(cursor_pos, suggestion_data['new_code'])
                 self.sql_editor.editor.insert(cursor_pos, text)
                 
-                # Highlight applied code
-                new_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
-                self.highlight_applied_code(cursor_pos, new_end)
-                # Tag for undo
+                inserted_start = cursor_pos
+                inserted_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
+            
+            # Highlight applied code in green (persistent until user interacts)
+            if inserted_start and inserted_end:
+                # Use a more visible green highlight that persists
+                self.sql_editor.editor.tag_configure("ai_accepted", 
+                                                    background="#4CAF50",  # Bright green
+                                                    foreground="#000000",
+                                                    relief="flat",
+                                                    borderwidth=0)
+                self.sql_editor.editor.tag_add("ai_accepted", inserted_start, inserted_end)
+                
+                # Also select/highlight the inserted query for easy re-optimization
+                # Remove any existing manual highlights first
+                self.sql_editor.editor.tag_remove("manual_highlight", "1.0", tk.END)
+                # Add manual highlight (yellow) so user can optimize it
+                self.sql_editor.editor.tag_add("manual_highlight", inserted_start, inserted_end)
+                
+                # Select the text so it's visible
+                self.sql_editor.editor.mark_set(tk.INSERT, inserted_start)
+                self.sql_editor.editor.see(inserted_start)
+                
+                # Store range for undo and re-optimization
                 try:
                     self.sql_editor.editor.tag_remove("ai_last_insert", "1.0", tk.END)
                 except Exception:
                     pass
-                self.sql_editor.editor.tag_add("ai_last_insert", cursor_pos, new_end)
-                self._last_ai_insert_range = (cursor_pos, new_end)
+                self.sql_editor.editor.tag_add("ai_last_insert", inserted_start, inserted_end)
+                self._last_ai_insert_range = (inserted_start, inserted_end)
             
-            # Add confirmation message to chat
-            self.add_confirmation_message("✅ Query inserted")
+            # Add confirmation message with "Optimize Again" button
+            self.add_confirmation_with_optimize_again(inserted_start, inserted_end, suggestion_data['new_code'])
             
-            # Disable buttons
+            # Disable Keep/Reject buttons
             self.disable_suggestion_buttons(suggestion_data)
             
         except Exception as e:
@@ -575,6 +606,51 @@ class HorizontalAIModal:
         self.chat_text.insert(tk.END, f"{message}\n\n", "separator")
         self.chat_text.see(tk.END)
     
+    def add_confirmation_with_optimize_again(self, start_pos, end_pos, query_text):
+        """Add confirmation message with Optimize Again button."""
+        try:
+            self.chat_text.insert(tk.END, "✅ Query inserted\n", "separator")
+            
+            # Create "Optimize Again" button
+            optimize_btn = tk.Button(self.chat_text,
+                                    text="🔄 Optimize Again",
+                                    bg="#1e1e1e", fg="#17a2b8", bd=0,
+                                    font=("Arial", 9, "underline"),
+                                    cursor="hand2",
+                                    relief="flat", activebackground="#1e1e1e",
+                                    activeforeground="#1fbad1", highlightthickness=0)
+            
+            # Bind command to optimize the inserted query
+            def optimize_again():
+                try:
+                    # Get the query text from the inserted range
+                    if start_pos and end_pos:
+                        query = self.sql_editor.editor.get(start_pos, end_pos).strip()
+                        if query:
+                            # Pre-fill the input with optimization request
+                            self.input_var.set(f"Optimize and improve this query:\n\n{query}")
+                            # Focus input
+                            self.input_entry.focus()
+                            # Trigger generation
+                            self.generate_sql()
+                    else:
+                        # Fallback: use the query text passed to this function
+                        self.input_var.set(f"Optimize and improve this query:\n\n{query_text}")
+                        self.input_entry.focus()
+                        self.generate_sql()
+                except Exception as e:
+                    print(f"Error in optimize_again: {e}")
+            
+            optimize_btn.configure(command=optimize_again)
+            
+            # Insert button inline
+            self.chat_text.window_create(tk.END, window=optimize_btn)
+            self.chat_text.insert(tk.END, "\n\n", "separator")
+            self.chat_text.see(tk.END)
+        except Exception as e:
+            print(f"Error adding optimize again button: {e}")
+            self.add_confirmation_message("✅ Query inserted")
+    
     def animate_message_fade(self):
         """Animate fade-in effect for new messages."""
         try:
@@ -616,17 +692,28 @@ class HorizontalAIModal:
             print(f"Error highlighting old code: {e}")
     
     def highlight_applied_code(self, start_pos, end_pos):
-        """Highlight applied code in green."""
+        """Highlight applied code in green (legacy method, kept for compatibility)."""
         try:
-            self.sql_editor.editor.tag_configure("ai_applied", 
-                                                background="#004d00",
-                                                foreground="#ccffcc",
-                                                relief="raised",
-                                                borderwidth=1)
-            self.sql_editor.editor.tag_add("ai_applied", start_pos, end_pos)
+            # Use the new persistent green highlight
+            self.sql_editor.editor.tag_configure("ai_accepted", 
+                                                background="#4CAF50",  # Bright green
+                                                foreground="#000000",
+                                                relief="flat",
+                                                borderwidth=0)
+            self.sql_editor.editor.tag_add("ai_accepted", start_pos, end_pos)
             
-            # Auto-remove after 3 seconds
-            self.modal_window.after(3000, lambda: self.remove_highlight("ai_applied"))
+            # Also add manual highlight for easy re-optimization
+            if hasattr(self.sql_editor.editor, 'tag_configure'):
+                # Ensure manual_highlight tag exists
+                try:
+                    self.sql_editor.editor.tag_configure("manual_highlight", 
+                                                        background="#ffeb3b",
+                                                        foreground="#000000")
+                except:
+                    pass
+                self.sql_editor.editor.tag_add("manual_highlight", start_pos, end_pos)
+            
+            # Don't auto-remove - let user control when to remove
         except Exception as e:
             print(f"Error highlighting applied code: {e}")
     
@@ -1227,6 +1314,31 @@ class HorizontalAIModal:
             self.history_text.delete("1.0", tk.END)
             self.history_text.config(state=tk.DISABLED)
             
+    def get_highlighted_text_from_editor(self):
+        """Get manually highlighted text (Ctrl+/) from the SQL editor."""
+        try:
+            if hasattr(self.sql_editor, 'editor'):
+                # Check for manual highlight tag
+                highlight_ranges = self.sql_editor.editor.tag_ranges("manual_highlight")
+                
+                if highlight_ranges:
+                    # Extract all highlighted text segments and combine them
+                    highlighted_segments = []
+                    for i in range(0, len(highlight_ranges), 2):
+                        start = self.sql_editor.editor.index(highlight_ranges[i])
+                        end = self.sql_editor.editor.index(highlight_ranges[i + 1])
+                        segment = self.sql_editor.editor.get(start, end)
+                        if segment.strip():
+                            highlighted_segments.append(segment.strip())
+                    
+                    if highlighted_segments:
+                        # Combine all highlighted segments with newlines
+                        combined_text = "\n".join(highlighted_segments)
+                        return combined_text
+        except Exception as e:
+            print(f"Error getting highlighted text: {e}")
+        return None
+    
     def get_selected_text_from_editor(self):
         """Get selected text from the SQL editor and highlight it."""
         try:
@@ -1265,6 +1377,13 @@ class HorizontalAIModal:
         # Reset per-trigger warning flag
         self.warning_active = False
         prompt = self.input_var.get().strip()
+        
+        # Add user message to session context BEFORE processing
+        if prompt:
+            self.session_context.append({'role': 'user', 'content': prompt})
+            if len(self.session_context) > self._max_context_items:
+                self.session_context = self.session_context[-self._max_context_items:]
+        
         # Show loading state
         self.input_entry.configure(state="disabled")
         self.input_var.set("🤖 Generating...")
@@ -1282,36 +1401,21 @@ class HorizontalAIModal:
                 # Partial selection -> predictive completion
                 if is_partial:
                     banner = "🔍 Completing your SQL...\n\n"
-                    er_text = self._get_er_text()
-                    mentions_text = self._get_mentions_text()
-                    base = self._build_context_text()
-                    parts = [p for p in [base, er_text, mentions_text] if p]
-                    context_text = "\n".join(parts)
-                    ai_prompt = f"""
-Complete the following partial SQL into a valid, executable SQLite query. Use context if relevant.
+                    instruction = f"""Complete the following partial SQL query into a valid, executable SQLite query.
+The user has selected this partial query and wants you to complete it:
 
-PARTIAL_SQL:
 {seltext}
 
-CONTEXT:
-{context_text}
-
-Return only the completed SQL, no explanations or code fences.
-"""
-                    schema = None
-                    if self.db_manager and self.db_manager.current_db:
-                        try:
-                            tables = self.db_manager.get_tables()
-                            table_schema = []
-                            for t in tables:
-                                try:
-                                    cols, _ = self.db_manager.get_table_data(t, limit=1)
-                                    table_schema.append({"table_name": t, "columns": [{"name": c, "type": "TEXT"} for c in cols]})
-                                except:
-                                    table_schema.append({"table_name": t, "columns": []})
-                            schema = {"database_name": self.db_manager.current_db, "tables": table_schema, "relationships": []}
-                        except Exception as e:
-                            print(f"Schema (partial mode) error: {e}")
+Please complete the query using the database schema and ensure it's syntactically correct and executable."""
+                    
+                    ai_prompt = self._build_enhanced_prompt(
+                        user_request=instruction,
+                        include_schema=True,
+                        include_history=True,
+                        include_highlighted_query=False  # Already in instruction
+                    )
+                    
+                    schema = self._get_formatted_schema()
                     ai_sql = None
                     self.ai_response_pending = True
                     try:
@@ -1332,6 +1436,8 @@ Return only the completed SQL, no explanations or code fences.
                         self.input_entry.configure(state="normal")
                         self.input_var.set("")
                         return
+                    # Show user prompt and assistant response
+                    self.add_chat_message("user", f"Complete partial SQL: {seltext[:100]}..." if len(seltext) > 100 else f"Complete partial SQL: {seltext}")
                     merged = f"{banner}{ai_sql_clean}\n"
                     self.add_chat_message("assistant", merged)
                     # Add suggestion with NEW only (no OLD)
@@ -1346,37 +1452,25 @@ Return only the completed SQL, no explanations or code fences.
                 # Strict validation for partial/invalid selection already routed above
                 # Build banner and targeted prompt
                 banner = "🧠 Editing selected code...\n\n"
-                ai_prompt = f"""
-Improve, fix, or optimize ONLY the following SQL query:
+                instruction = f"""The user has selected the following SQL query and wants you to improve, fix, or optimize it:
 
 {seltext}
 
-Return only the improved query, no explanations, code fences, or extra symbols.
-"""
-                # Prepare minimal schema (best-effort)
-                schema = None
-                if self.db_manager and self.db_manager.current_db:
-                    try:
-                        tables = self.db_manager.get_tables()
-                        table_schema = []
-                        for t in tables:
-                            try:
-                                cols, _ = self.db_manager.get_table_data(t, limit=1)
-                                table_schema.append({"table_name": t, "columns": [{"name": c, "type": "TEXT"} for c in cols]})
-                            except:
-                                table_schema.append({"table_name": t, "columns": []})
-                        schema = {"database_name": self.db_manager.current_db, "tables": table_schema, "relationships": []}
-                    except Exception as e:
-                        print(f"Schema (selection mode) error: {e}")
-                # Include session context for incremental improvements
-                # Add ER and mentions to context for selection-based edits
-                er_text = self._get_er_text()
-                mentions_text = self._get_mentions_text()
-                base = self._build_context_text()
-                parts = [p for p in [base, er_text, mentions_text] if p]
-                context_text = "\n".join(parts)
-                if context_text:
-                    ai_prompt += f"\nCONTEXT:\n{context_text}\n"
+Please provide an improved version of this query. Consider:
+- Fixing any syntax errors
+- Optimizing performance
+- Improving readability
+- Adding proper error handling if applicable
+- Using best SQL practices"""
+                
+                ai_prompt = self._build_enhanced_prompt(
+                    user_request=instruction,
+                    include_schema=True,
+                    include_history=True,
+                    include_highlighted_query=False  # Already in instruction
+                )
+                
+                schema = self._get_formatted_schema()
                 # Call AI
                 ai_sql = None
                 self.ai_response_pending = True
@@ -1405,10 +1499,13 @@ Return only the improved query, no explanations, code fences, or extra symbols.
                 def _norm(s):
                     return (s or "").strip().rstrip(';').strip()
                 if _norm(ai_sql_clean) == _norm(seltext):
+                    self.add_chat_message("user", prompt if prompt else f"Improve query: {seltext[:100]}..." if len(seltext) > 100 else f"Improve query: {seltext}")
                     self.add_chat_message("assistant", "No changes suggested for this selection.")
                     self.input_entry.configure(state="normal")
                     self.input_var.set("")
                     return
+                # Show user message first
+                self.add_chat_message("user", prompt if prompt else f"Improve query: {seltext[:100]}..." if len(seltext) > 100 else f"Improve query: {seltext}")
                 # Merge banner + SQL as single assistant line before suggestion block
                 merged = f"{banner}{ai_sql_clean}\n"
                 # Determine selection positions (best-effort)
@@ -1457,21 +1554,18 @@ Return only the improved query, no explanations, code fences, or extra symbols.
             # If empty prompt, start a draft using context (incl. full file) and schema
             if not prompt_text:
                 banner = "🧠 Starting a new query draft...\n\n"
-                file_ctx = self._get_file_context_snippet()
-                context_base = self._build_context_text()
-                er_text = self._get_er_text()
-                mentions_text = self._get_mentions_text()
-                convention = self._get_mention_convention_text()
-                parts = [p for p in [context_base, er_text, mentions_text, convention, file_ctx] if p]
-                context_text = "\n".join(parts)
-                ai_prompt = f"""
-Generate a relevant starter SQL query for this database. Use context if helpful.
-
-CONTEXT:
-{context_text}
-
-Return only the SQL, no explanations or code fences.
-"""
+                instruction = """Generate a relevant starter SQL query for this database. 
+Based on the database schema, suggest a useful query that demonstrates the database structure.
+This could be a simple SELECT query that shows data from one or more tables."""
+                
+                ai_prompt = self._build_enhanced_prompt(
+                    user_request=instruction,
+                    include_schema=True,
+                    include_history=False,  # New query, no history needed
+                    include_highlighted_query=True
+                )
+                
+                schema = self._get_formatted_schema()
                 ai_sql = None
                 self.ai_response_pending = True
                 try:
@@ -1492,6 +1586,8 @@ Return only the SQL, no explanations or code fences.
                     self.input_entry.configure(state="normal")
                     self.input_var.set("")
                     return
+                # Show user and assistant messages
+                self.add_chat_message("user", "Generate starter SQL query")
                 merged = f"{banner}{ai_sql_clean}\n"
                 self.add_chat_message("assistant", merged)
                 # Explicitly add compact Keep/Reject
@@ -1506,24 +1602,22 @@ Return only the SQL, no explanations or code fences.
                 return
             # If non-SQL prompt, convert natural language to SQL (use full file as context too)
             if not self._looks_like_sql(prompt_text):
-                file_ctx = self._get_file_context_snippet()
-                context_base = self._build_context_text()
-                er_text = self._get_er_text()
-                mentions_text = self._get_mentions_text()
-                convention = self._get_mention_convention_text()
-                parts = [p for p in [context_base, er_text, mentions_text, convention, file_ctx] if p]
-                context_text = "\n".join(parts)
                 norm_instruction = self._normalize_mentions(prompt_text)
-                ai_prompt = f"""
-Modify or extend the previous SQL based on this instruction (mentions already normalized as [[TABLE:]] and {{COLUMN:}}):
+                instruction = f"""The user has provided a natural language request to generate or modify SQL.
+Please convert this request into a valid SQL query.
 
-INSTRUCTION: {norm_instruction}
+User Request (with normalized mentions): {norm_instruction}
 
-CONTEXT:
-{context_text}
-
-Return only the final SQL, no explanations or code fences.
-"""
+Generate a complete, executable SQL query that fulfills the user's request."""
+                
+                ai_prompt = self._build_enhanced_prompt(
+                    user_request=instruction,
+                    include_schema=True,
+                    include_history=True,
+                    include_highlighted_query=True
+                )
+                
+                schema = self._get_formatted_schema()
                 ai_sql = None
                 self.ai_response_pending = True
                 try:
@@ -1554,29 +1648,24 @@ Return only the final SQL, no explanations or code fences.
                 return
             # Otherwise, treat as direct SQL text and refine
             norm_request = self._normalize_mentions(prompt_text)
-            enhanced_prompt = f"""Generate a complete, executable SQL query for: {norm_request}
+            instruction = f"""The user has provided what appears to be SQL or a SQL-related request: {norm_request}
 
-Requirements:
-- Return ONLY the SQL query, no explanations
-- Ensure the query is complete and ends with semicolon
-- Use proper SQLite syntax
-{f"- Database context: {self.db_manager.current_db}" if self.db_manager and self.db_manager.current_db else ""}
-"""
-            # Include context for continuity even in plain mode (and include full file)
-            file_ctx = self._get_file_context_snippet()
-            er_text = self._get_er_text()
-            mentions_text = self._get_mentions_text()
-            context_base = self._build_context_text()
-            convention = self._get_mention_convention_text()
-            parts = [p for p in [context_base, er_text, mentions_text, convention, file_ctx] if p]
-            context_text = "\n".join(parts)
-            if context_text:
-                enhanced_prompt += f"\nCONTEXT:\n{context_text}\n"
+Please generate a complete, executable SQL query. If the input is already valid SQL, you may optimize or refine it.
+Otherwise, interpret the request and generate appropriate SQL."""
+            
+            ai_prompt = self._build_enhanced_prompt(
+                user_request=instruction,
+                include_schema=True,
+                include_history=True,
+                include_highlighted_query=True
+            )
+            
+            schema = self._get_formatted_schema()
             ai_sql = None
             self.ai_response_pending = True
             try:
-                self._debug_print_prompt(enhanced_prompt)
-                ai_sql = self.ai_integration.generate_sql_query(enhanced_prompt, schema)
+                self._debug_print_prompt(ai_prompt)
+                ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
             except Exception as e:
                 print(f"AI error: {e}")
             finally:
@@ -1594,7 +1683,8 @@ Requirements:
                 self.input_entry.configure(state="normal")
                 self.input_var.set("")
                 return
-            # Plain generated SQL: show line and explicit compact Keep/Reject
+            # Plain generated SQL: show user message and assistant response
+            self.add_chat_message("user", prompt_text)
             self.add_chat_message("assistant", ai_sql_clean)
             try:
                 self._add_suggestion_block("", ai_sql_clean)
@@ -1681,9 +1771,16 @@ Requirements:
         try:
             self.sql_editor.editor.tag_remove("ai_selected", "1.0", tk.END)
             self.sql_editor.editor.tag_remove("ai_replaced", "1.0", tk.END)
-            # Do not auto-remove ai_prompt; it's persistent until user drops it
+            # Do not auto-remove ai_prompt or ai_accepted; they're persistent until user drops them
         except Exception as e:
             print(f"Error removing highlights: {e}")
+    
+    def remove_accepted_highlight(self):
+        """Remove the green accepted highlight (call this when user edits the query)."""
+        try:
+            self.sql_editor.editor.tag_remove("ai_accepted", "1.0", tk.END)
+        except Exception as e:
+            print(f"Error removing accepted highlight: {e}")
     
     def on_editor_click(self, event):
         """Handle click events in the SQL editor to remove highlights."""
@@ -1994,6 +2091,299 @@ Requirements:
             return "\n".join(lines[-self._max_context_items:])
         except Exception:
             return ""
+    
+    def _get_formatted_schema(self) -> Dict[str, Any]:
+        """Get properly formatted database schema with full table and column information."""
+        try:
+            if not self.db_manager or not self.db_manager.current_db:
+                return None
+            
+            # Use the proper schema extraction method if available
+            if hasattr(self.db_manager, 'get_database_schema_for_ai'):
+                return self.db_manager.get_database_schema_for_ai()
+            
+            # Fallback: manual extraction
+            tables = self.db_manager.get_tables()
+            schema = {
+                "database_name": self.db_manager.current_db,
+                "tables": [],
+                "relationships": []
+            }
+            
+            for table_name in tables:
+                try:
+                    # Get column info using PRAGMA
+                    self.db_manager.cursor.execute(f"PRAGMA table_info({table_name})")
+                    columns_info = self.db_manager.cursor.fetchall()
+                    
+                    columns = []
+                    for col in columns_info:
+                        # PRAGMA table_info returns: (cid, name, type, notnull, dflt_value, pk)
+                        col_info = {
+                            "name": col[1],
+                            "type": col[2],
+                            "nullable": not bool(col[3]),
+                            "primary_key": bool(col[5]),
+                            "default_value": col[4] if col[4] is not None else None
+                        }
+                        columns.append(col_info)
+                    
+                    table_info = {
+                        "table_name": table_name,
+                        "columns": columns
+                    }
+                    schema["tables"].append(table_info)
+                    
+                    # Get foreign key relationships
+                    self.db_manager.cursor.execute(f"PRAGMA foreign_key_list({table_name})")
+                    foreign_keys = self.db_manager.cursor.fetchall()
+                    
+                    for fk in foreign_keys:
+                        # PRAGMA foreign_key_list returns: (id, seq, table, from, to, on_update, on_delete, match)
+                        relationship = {
+                            "from_table": table_name,
+                            "from_column": fk[3],
+                            "to_table": fk[2],
+                            "to_column": fk[4]
+                        }
+                        schema["relationships"].append(relationship)
+                        
+                except Exception as e:
+                    print(f"Error extracting schema for table {table_name}: {e}")
+                    continue
+            
+            return schema
+        except Exception as e:
+            print(f"Error getting formatted schema: {e}")
+            return None
+    
+    def _format_schema_for_prompt(self, schema: Dict[str, Any]) -> str:
+        """Format database schema in a clean, readable format for AI prompts."""
+        if not schema or not schema.get('tables'):
+            return "DATABASE SCHEMA: No database schema available.\n"
+        
+        db_name = schema.get('database_name', 'Unknown')
+        formatted = f"""
+═══════════════════════════════════════════════════════════════
+DATABASE SCHEMA
+═══════════════════════════════════════════════════════════════
+Database: {db_name}
+
+"""
+        
+        # Format each table
+        for table in schema.get('tables', []):
+            table_name = table.get('table_name', 'unknown')
+            columns = table.get('columns', [])
+            
+            formatted += f"📊 TABLE: {table_name}\n"
+            formatted += "   Columns:\n"
+            
+            for col in columns:
+                col_name = col.get('name', 'unknown')
+                col_type = col.get('type', 'TEXT')
+                is_pk = col.get('primary_key', False)
+                is_nullable = col.get('nullable', True)
+                default_val = col.get('default_value')
+                
+                # Build column description
+                col_desc = f"      • {col_name} ({col_type})"
+                
+                if is_pk:
+                    col_desc += " [PRIMARY KEY]"
+                if not is_nullable:
+                    col_desc += " [NOT NULL]"
+                if default_val is not None:
+                    col_desc += f" [DEFAULT: {default_val}]"
+                
+                formatted += col_desc + "\n"
+            
+            formatted += "\n"
+        
+        # Format relationships
+        relationships = schema.get('relationships', [])
+        if relationships:
+            formatted += "🔗 RELATIONSHIPS (Foreign Keys):\n"
+            for rel in relationships:
+                from_tbl = rel.get('from_table', '')
+                from_col = rel.get('from_column', '')
+                to_tbl = rel.get('to_table', '')
+                to_col = rel.get('to_column', '')
+                formatted += f"   • {from_tbl}.{from_col} → {to_tbl}.{to_col}\n"
+            formatted += "\n"
+        
+        formatted += "═══════════════════════════════════════════════════════════════\n"
+        return formatted
+    
+    def _get_highlighted_query_for_prompt(self) -> str:
+        """Get highlighted query text formatted for AI prompt."""
+        try:
+            if hasattr(self.sql_editor, 'get_query_for_ai'):
+                query_text, is_highlighted = self.sql_editor.get_query_for_ai()
+                if query_text and query_text.strip():
+                    if is_highlighted:
+                        return f"""
+═══════════════════════════════════════════════════════════════
+HIGHLIGHTED QUERY (User wants help with this specific query)
+═══════════════════════════════════════════════════════════════
+{query_text}
+
+═══════════════════════════════════════════════════════════════
+"""
+                    else:
+                        return f"""
+═══════════════════════════════════════════════════════════════
+CURRENT QUERY IN EDITOR (Full editor content)
+═══════════════════════════════════════════════════════════════
+{query_text}
+
+═══════════════════════════════════════════════════════════════
+"""
+        except Exception as e:
+            print(f"Error getting highlighted query: {e}")
+        
+        return ""
+    
+    def _format_conversation_history(self) -> str:
+        """Format conversation history for AI prompt."""
+        try:
+            if not self.session_context or len(self.session_context) == 0:
+                return ""
+            
+            history_text = """
+═══════════════════════════════════════════════════════════════
+CONVERSATION HISTORY
+═══════════════════════════════════════════════════════════════
+This is the context from previous interactions in this session.
+
+"""
+            
+            # Include last N messages (most recent first, but we'll reverse for chronological order)
+            recent_context = self.session_context[-self._max_context_items:]
+            
+            for idx, item in enumerate(recent_context, 1):
+                role = item.get('role', 'user')
+                content = (item.get('content') or '').strip()
+                if not content:
+                    continue
+                
+                role_label = "👤 USER" if role == 'user' else "🤖 ASSISTANT"
+                # Truncate very long messages to avoid token bloat
+                if len(content) > 2000:
+                    content = content[:2000] + "\n... (truncated)"
+                
+                history_text += f"{idx}. {role_label}:\n{content}\n\n"
+            
+            history_text += "═══════════════════════════════════════════════════════════════\n"
+            return history_text
+        except Exception:
+            return ""
+    
+    def _build_enhanced_prompt(self, user_request: str, include_schema: bool = True, 
+                               include_history: bool = True, include_highlighted_query: bool = True,
+                               instruction_context: str = "") -> str:
+        """Build a comprehensive, well-structured prompt with all context."""
+        
+        prompt_parts = []
+        
+        # 1. Clear instruction header
+        prompt_parts.append("""
+═══════════════════════════════════════════════════════════════
+INSTRUCTIONS
+═══════════════════════════════════════════════════════════════
+You are an expert SQL query assistant. Your task is to help generate, 
+optimize, fix, or improve SQL queries for SQLite databases.
+
+IMPORTANT GUIDELINES:
+1. Generate clean, efficient, and valid SQLite-compatible SQL queries
+2. Use proper SQL syntax and best practices
+3. Include appropriate JOINs when working with multiple tables
+4. Use WHERE clauses effectively for filtering
+5. Consider performance implications
+6. Return ONLY the SQL query - no markdown, no code fences, no explanations
+7. Ensure queries end with a semicolon (;)
+8. If the user has highlighted specific query text, focus on that query
+9. Use the provided database schema to ensure accurate table and column names
+10. Consider conversation history for context in follow-up requests
+
+═══════════════════════════════════════════════════════════════
+
+""")
+        
+        # 2. Database Schema
+        if include_schema:
+            schema = self._get_formatted_schema()
+            if schema:
+                prompt_parts.append(self._format_schema_for_prompt(schema))
+            else:
+                prompt_parts.append("DATABASE SCHEMA: No database available.\n\n")
+        
+        # 3. Highlighted/Current Query
+        if include_highlighted_query:
+            highlighted_query = self._get_highlighted_query_for_prompt()
+            if highlighted_query:
+                prompt_parts.append(highlighted_query)
+        
+        # 4. Conversation History
+        if include_history:
+            history = self._format_conversation_history()
+            if history:
+                prompt_parts.append(history)
+        
+        # 5. Additional Context (ER, mentions, file context, etc.)
+        context_parts = []
+        
+        er_text = self._get_er_text()
+        if er_text:
+            context_parts.append(er_text)
+        
+        mentions_text = self._get_mentions_text()
+        if mentions_text:
+            context_parts.append(mentions_text)
+        
+        convention = self._get_mention_convention_text()
+        if convention:
+            context_parts.append(convention)
+        
+        file_ctx = self._get_file_context_snippet()
+        if file_ctx:
+            context_parts.append(file_ctx)
+        
+        if context_parts:
+            prompt_parts.append("""
+═══════════════════════════════════════════════════════════════
+ADDITIONAL CONTEXT
+═══════════════════════════════════════════════════════════════
+""")
+            prompt_parts.append("\n".join(context_parts))
+            prompt_parts.append("\n═══════════════════════════════════════════════════════════════\n")
+        
+        # 6. Custom instruction context (if provided)
+        if instruction_context:
+            prompt_parts.append(f"""
+═══════════════════════════════════════════════════════════════
+SPECIFIC INSTRUCTION
+═══════════════════════════════════════════════════════════════
+{instruction_context}
+
+═══════════════════════════════════════════════════════════════
+""")
+        
+        # 7. User Request
+        prompt_parts.append(f"""
+═══════════════════════════════════════════════════════════════
+USER REQUEST
+═══════════════════════════════════════════════════════════════
+{user_request}
+
+═══════════════════════════════════════════════════════════════
+
+Please generate the appropriate SQL query based on the above context and user request.
+Return ONLY the SQL query, no explanations or markdown formatting.
+
+""")
+        
+        return "\n".join(prompt_parts)
 
     def _get_file_context_snippet(self) -> str:
         """Return a trimmed CURRENT_FILE section from the editor, or empty string if unavailable."""

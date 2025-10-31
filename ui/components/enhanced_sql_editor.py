@@ -153,6 +153,9 @@ class EnhancedSQLEditor:
         self.editor.bind("<FocusIn>", self.on_focus_in)
         self.editor.bind("<FocusOut>", self.on_focus_out)
         self.editor.bind("<Button-3>", self.on_right_click)  # Right-click for AI popup
+        # Bind Ctrl+/ for toggle highlight
+        self.editor.bind("<Control-slash>", lambda e: self.toggle_highlight())
+        self.editor.bind("<Control-question>", lambda e: self.toggle_highlight())  # Alternative binding
         
         # Scrollbar for editor
         editor_scrollbar = ttk.Scrollbar(editor_frame, orient=tk.VERTICAL, command=self.editor.yview)
@@ -228,6 +231,13 @@ class EnhancedSQLEditor:
         self.editor.tag_configure("function", foreground="#dcdcaa")
         self.editor.tag_configure("error", foreground="#f44747", background="#2d2d2d")
         
+        # Configure highlight tag for manual highlighting
+        self.editor.tag_configure("manual_highlight", 
+                                 background="#ffeb3b", 
+                                 foreground="#000000",
+                                 relief="raised",
+                                 borderwidth=1)
+        
         # Store keywords for highlighting
         self.sql_keywords = keywords
     
@@ -244,6 +254,18 @@ class EnhancedSQLEditor:
     
     def on_key_press(self, event):
         """Handle key press event."""
+        # Remove accepted highlight if user starts editing (typing, deleting, etc.)
+        if event.keysym not in ["Up", "Down", "Left", "Right", "Home", "End", "Page_Up", "Page_Down", 
+                               "Tab", "Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R",
+                               "Escape", "Return", "Enter"]:
+            # User is typing/editing - remove accepted highlight if it exists
+            try:
+                if hasattr(self, 'horizontal_ai_modal') and self.horizontal_ai_modal:
+                    if hasattr(self.horizontal_ai_modal, 'remove_accepted_highlight'):
+                        self.horizontal_ai_modal.remove_accepted_highlight()
+            except Exception:
+                pass
+        
         # Handle Tab key for autocomplete
         if event.keysym == "Tab" and self.suggestion_window:
             self.accept_suggestion()
@@ -282,6 +304,26 @@ class EnhancedSQLEditor:
     def on_click(self, event):
         """Handle click event."""
         self.update_cursor_position()
+        
+        # Remove accepted highlight if user clicks to edit elsewhere
+        try:
+            if hasattr(self, 'horizontal_ai_modal') and self.horizontal_ai_modal:
+                if hasattr(self.horizontal_ai_modal, 'remove_accepted_highlight'):
+                    # Only remove if cursor is outside the accepted range
+                    cursor_pos = self.editor.index(tk.INSERT)
+                    accepted_ranges = self.editor.tag_ranges("ai_accepted")
+                    is_in_accepted = False
+                    for i in range(0, len(accepted_ranges), 2):
+                        if len(accepted_ranges) > i + 1:
+                            start = self.editor.index(accepted_ranges[i])
+                            end = self.editor.index(accepted_ranges[i + 1])
+                            if self.editor.compare(cursor_pos, ">=", start) and self.editor.compare(cursor_pos, "<=", end):
+                                is_in_accepted = True
+                                break
+                    if not is_in_accepted:
+                        self.horizontal_ai_modal.remove_accepted_highlight()
+        except Exception:
+            pass
     
     def on_focus_in(self, event):
         """Handle focus in event."""
@@ -314,6 +356,7 @@ class EnhancedSQLEditor:
         # Selection operations
         context_menu.add_command(label="🔍 Select All", command=self.select_all, accelerator="Ctrl+A")
         context_menu.add_command(label="🔍 Find", command=self.find_text, accelerator="Ctrl+F")
+        context_menu.add_command(label="🖍️ Toggle Highlight", command=self.toggle_highlight, accelerator="Ctrl+/")
         context_menu.add_separator()
         
         # AI operations
@@ -388,40 +431,129 @@ class EnhancedSQLEditor:
             else:
                 self.status_label.configure(text=f"'{search_text}' not found")
     
+    def get_query_for_ai(self):
+        """Get highlighted query or all query text for AI operations.
+        Returns tuple: (query_text, is_highlighted)"""
+        try:
+            # Check for highlighted text first
+            highlight_ranges = self.editor.tag_ranges("manual_highlight")
+            
+            if highlight_ranges:
+                # Extract all highlighted text segments and combine them
+                highlighted_segments = []
+                for i in range(0, len(highlight_ranges), 2):
+                    start = self.editor.index(highlight_ranges[i])
+                    end = self.editor.index(highlight_ranges[i + 1])
+                    segment = self.editor.get(start, end)
+                    if segment.strip():
+                        highlighted_segments.append(segment.strip())
+                
+                if highlighted_segments:
+                    # Combine all highlighted segments with newlines
+                    combined_query = "\n".join(highlighted_segments)
+                    return combined_query, True
+            
+            # No highlighted text, return all editor content
+            all_text = self.editor.get("1.0", tk.END).strip()
+            return all_text, False
+            
+        except Exception as e:
+            # Fallback to all text on error
+            all_text = self.editor.get("1.0", tk.END).strip()
+            return all_text, False
+    
+    def toggle_highlight(self):
+        """Toggle highlight on selected text or current line if no selection."""
+        try:
+            # Get selection if exists
+            if self.editor.tag_ranges(tk.SEL):
+                start = self.editor.index(tk.SEL_FIRST)
+                end = self.editor.index(tk.SEL_LAST)
+                has_selection = True
+            else:
+                # If no selection, highlight current line
+                current_line = self.editor.index(tk.INSERT)
+                line_start = current_line.split('.')[0] + '.0'
+                line_end = current_line.split('.')[0] + '.end'
+                start = line_start
+                end = line_end
+                has_selection = False
+            
+            # Check if any part of the selected range has the highlight tag
+            highlight_ranges = self.editor.tag_ranges("manual_highlight")
+            is_highlighted = False
+            
+            # Check if the start position is within any highlight range
+            for i in range(0, len(highlight_ranges), 2):
+                highlight_start = self.editor.index(highlight_ranges[i])
+                highlight_end = self.editor.index(highlight_ranges[i + 1])
+                
+                # Check if our range overlaps with this highlight
+                if (self.editor.compare(start, ">=", highlight_start) and 
+                    self.editor.compare(start, "<=", highlight_end)) or \
+                   (self.editor.compare(end, ">=", highlight_start) and 
+                    self.editor.compare(end, "<=", highlight_end)) or \
+                   (self.editor.compare(start, "<=", highlight_start) and 
+                    self.editor.compare(end, ">=", highlight_end)):
+                    is_highlighted = True
+                    break
+            
+            if is_highlighted:
+                # Remove highlight from the range
+                self.editor.tag_remove("manual_highlight", start, end)
+                if has_selection:
+                    self.status_label.configure(text="Highlight removed")
+                else:
+                    self.status_label.configure(text="Line highlight removed")
+            else:
+                # Add highlight
+                self.editor.tag_add("manual_highlight", start, end)
+                # Move cursor to end to see the highlight better
+                if not has_selection:
+                    # Temporarily show selection
+                    self.editor.tag_add(tk.SEL, start, end)
+                    self.editor.after(200, lambda: self.editor.tag_remove(tk.SEL, start, end))
+                self.editor.mark_set(tk.INSERT, end)
+                self.editor.see(tk.INSERT)
+                if has_selection:
+                    self.status_label.configure(text="Text highlighted")
+                else:
+                    self.status_label.configure(text="Line highlighted")
+                
+        except Exception as e:
+            self.status_label.configure(text="Error toggling highlight")
+            print(f"Error in toggle_highlight: {e}")
+    
     
     def ai_optimize_query(self):
-        """Optimize current query using AI."""
-        try:
-            selected_text = self.editor.get(tk.SEL_FIRST, tk.SEL_LAST)
-            query_to_optimize = selected_text
-        except:
-            query_to_optimize = self.editor.get("1.0", tk.END).strip()
+        """Optimize highlighted query or all query using AI."""
+        query, is_highlighted = self.get_query_for_ai()
         
-        if query_to_optimize and self.ai_pipeline.is_available():
+        if query and self.ai_pipeline.is_available():
             # Show horizontal AI modal with optimization prompt
             self.show_horizontal_ai_modal()
             # Pre-fill with optimization prompt
             if hasattr(self.horizontal_ai_modal, 'input_entry'):
                 self.horizontal_ai_modal.input_entry.delete(0, tk.END)
-                self.horizontal_ai_modal.input_entry.insert(0, f"Optimize this query for better performance: {query_to_optimize}")
+                query_label = "highlighted query" if is_highlighted else "query"
+                self.horizontal_ai_modal.input_entry.insert(0, f"Optimize this {query_label} for better performance:\n\n{query}")
         else:
-            self.status_label.configure(text="Please select or write a query to optimize")
+            self.status_label.configure(text="Please highlight or write a query to optimize")
     
     def ai_explain(self):
-        """Explain selected SQL."""
-        try:
-            selected_text = self.editor.get(tk.SEL_FIRST, tk.SEL_LAST)
-            if selected_text:
-                # Show horizontal AI modal with explanation prompt
-                self.show_horizontal_ai_modal()
-                # Pre-fill with explanation prompt
-                if hasattr(self.horizontal_ai_modal, 'input_entry'):
-                    self.horizontal_ai_modal.input_entry.delete(0, tk.END)
-                    self.horizontal_ai_modal.input_entry.insert(0, f"Explain this SQL query: {selected_text}")
-            else:
-                self.status_label.configure(text="Please select SQL text to explain")
-        except:
-            self.status_label.configure(text="Please select SQL text to explain")
+        """Explain highlighted SQL or all SQL."""
+        query, is_highlighted = self.get_query_for_ai()
+        
+        if query:
+            # Show horizontal AI modal with explanation prompt
+            self.show_horizontal_ai_modal()
+            # Pre-fill with explanation prompt
+            if hasattr(self.horizontal_ai_modal, 'input_entry'):
+                self.horizontal_ai_modal.input_entry.delete(0, tk.END)
+                query_label = "highlighted SQL query" if is_highlighted else "SQL query"
+                self.horizontal_ai_modal.input_entry.insert(0, f"Explain this {query_label}:\n\n{query}")
+        else:
+            self.status_label.configure(text="Please highlight or write SQL text to explain")
     
     def format_sql(self):
         """Format SQL code."""
@@ -921,11 +1053,14 @@ class EnhancedSQLEditor:
             self.status_label.configure(text=f"AI Error: {str(e)}")
     
     def explain_sql(self):
-        """Explain the current SQL query."""
-        query = self.editor.get("1.0", tk.END).strip()
+        """Explain highlighted SQL or all SQL."""
+        query, is_highlighted = self.get_query_for_ai()
         if not query:
             self.status_label.configure(text="No query to explain")
             return
+        
+        status_msg = "Explaining highlighted query..." if is_highlighted else "Explaining query..."
+        self.status_label.configure(text=status_msg)
         
         if self.ai_integration:
             explanation = self.ai_integration.explain_sql(query)
@@ -972,8 +1107,8 @@ class EnhancedSQLEditor:
         """Set reference to sidebar."""
         self.sidebar = sidebar
     
-    def show_horizontal_ai_modal(self):
-        """Show the horizontal AI modal."""
+    def show_horizontal_ai_modal(self, initial_text=None):
+        """Show the horizontal AI modal with highlighted query if available."""
         # Create horizontal AI modal if not exists
         if not self.horizontal_ai_modal:
             self.horizontal_ai_modal = HorizontalAIModal(
@@ -982,6 +1117,16 @@ class EnhancedSQLEditor:
                 self,
                 self.db_manager
             )
+        
+        # Get highlighted query or all query for AI prompt
+        query, is_highlighted = self.get_query_for_ai()
+        
+        # If no initial text provided, use highlighted query or all query
+        if initial_text is None and query:
+            if is_highlighted:
+                initial_text = f"Please help me with this highlighted query:\n\n{query}"
+            else:
+                initial_text = f"Please help me with this query:\n\n{query}"
         
         # Show modal at cursor position
         cursor_pos = self.editor.index(tk.INSERT)
@@ -997,6 +1142,25 @@ class EnhancedSQLEditor:
             center_x = self.editor.winfo_rootx() + self.editor.winfo_width() // 2
             center_y = self.editor.winfo_rooty() + self.editor.winfo_height() // 2
             self.horizontal_ai_modal.show_at_position(center_x, center_y)
+        
+        # Pre-fill input after modal is created (use after to ensure modal is ready)
+        if initial_text:
+            def prefill_input():
+                try:
+                    # Try using input_var first (StringVar)
+                    if hasattr(self.horizontal_ai_modal, 'input_var') and self.horizontal_ai_modal.input_var:
+                        self.horizontal_ai_modal.input_var.set(initial_text)
+                    # Also try input_entry directly
+                    elif hasattr(self.horizontal_ai_modal, 'input_entry') and self.horizontal_ai_modal.input_entry:
+                        self.horizontal_ai_modal.input_entry.delete(0, tk.END)
+                        self.horizontal_ai_modal.input_entry.insert(0, initial_text)
+                        self.horizontal_ai_modal.input_entry.select_range(0, tk.END)
+                except Exception as e:
+                    print(f"Error pre-filling AI modal: {e}")
+            
+            # Wait a bit for modal to be ready, then pre-fill (try multiple times with increasing delay)
+            self.editor.after(50, prefill_input)
+            self.editor.after(150, prefill_input)  # Backup in case first one was too early
     
     def _handle_create_database(self, query: str):
         """Handle CREATE DATABASE command."""
