@@ -1,7 +1,16 @@
 {
   "theme": "flatly",
-  "api_keys": [],
-  "selected_api_key": null,
+  "api_keys": [
+    {
+      "id": 1,
+      "name": "Surjit Api key",
+      "api_key": "AIzaSyCcY01MZsIFwm1li0IAf_pk5knwo6emVjo",
+      "provider": "gemini",
+      "created_at": "2025-11-01T01:21:37.993662",
+      "last_used": null
+    }
+  ],
+  "selected_api_key": 1,
   "window_geometry": "1200x800",
   "auto_save": true,
   "syntax_highlighting": true,

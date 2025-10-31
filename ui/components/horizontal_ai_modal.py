@@ -85,6 +85,79 @@ class HorizontalAIModal:
         
         # Per-trigger AI response guard to avoid duplicate assistant blocks
         self.ai_response_pending = False
+    
+    def _extract_clean_error_message(self, error: Exception) -> str:
+        """Extract clean error message from AI exception, removing metadata and formatting."""
+        error_str = str(error)
+        
+        # Try to extract message from Google API error format
+        # Format: metadata {...}, locale: "...", message: "actual message"
+        import re
+        
+        # Look for message field in the error string
+        message_match = re.search(r'message:\s*"([^"]+)"', error_str, re.IGNORECASE)
+        if message_match:
+            return message_match.group(1)
+        
+        # Look for common error patterns
+        patterns = [
+            r'"([^"]+API key[^"]+)"',  # API key related messages in quotes
+            r'message:\s*([^\n,}]+)',  # message: followed by text
+            r'Error:\s*([^\n]+)',      # Error: followed by text
+            r'([A-Z][^"]{20,200})',    # Capitalized sentence (20-200 chars)
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, error_str, re.IGNORECASE | re.MULTILINE)
+            if match:
+                clean_msg = match.group(1).strip()
+                # Remove common prefixes/suffixes
+                clean_msg = re.sub(r'^(error|exception|failed):\s*', '', clean_msg, flags=re.IGNORECASE)
+                clean_msg = clean_msg.strip('.,;:')
+                if len(clean_msg) > 10 and len(clean_msg) < 500:  # Reasonable message length
+                    return clean_msg
+        
+        # Fallback: return first meaningful sentence
+        sentences = re.split(r'[.!?]\s+', error_str)
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if len(sentence) > 20 and len(sentence) < 300:
+                # Remove metadata indicators
+                if not any(indicator in sentence.lower() for indicator in ['metadata', 'locale', 'key:', 'value:', 'traceback']):
+                    return sentence
+        
+        # Last resort: return first 200 chars, cleaned up
+        clean = error_str[:200].strip()
+        clean = re.sub(r'\s+', ' ', clean)  # Normalize whitespace
+        return clean if clean else "An error occurred"
+    
+    def _handle_ai_error(self, error: Exception):
+        """Handle AI errors, especially API key errors, displaying in chat."""
+        # Extract clean error message
+        clean_error_msg = self._extract_clean_error_message(error)
+        error_msg_lower = clean_error_msg.lower()
+        
+        print(f"AI error (clean): {clean_error_msg}")
+        
+        # Build error message for chat
+        if any(keyword in error_msg_lower for keyword in ['api key', 'api_key', 'invalid', 'unauthorized', '403', '401', 'permission', 'authentication', 'not valid']):
+            # API key error - provide helpful message
+            error_content = f"❌ API Key Error\n\n{clean_error_msg}\n\n" \
+                          f"📝 To fix this:\n" \
+                          f"1. Go to Settings → API Keys\n" \
+                          f"2. Check or update your Gemini API key\n" \
+                          f"3. Make sure the key is valid and active\n" \
+                          f"4. Get a new key from: https://aistudio.google.com/apikey"
+        else:
+            # Other AI errors
+            error_content = f"❌ AI Error\n\n{clean_error_msg}"
+        
+        # Add error message to chat directly
+        if hasattr(self, 'chat_text') and self.chat_text:
+            self.add_chat_message("assistant", error_content)
+        
+        # Also show warning in input field
+        self._warn_once(f"⚠️ {clean_error_msg[:50]}")
         
     def show_modal(self, event=None, position=None):
         """Show the horizontal AI modal with smart positioning and selection mode detection."""
@@ -1418,13 +1491,23 @@ Please complete the query using the database schema and ensure it's syntacticall
                     schema = self._get_formatted_schema()
                     ai_sql = None
                     self.ai_response_pending = True
+                    # Add user message to chat first
+                    self.add_chat_message("user", f"Complete partial SQL: {seltext[:100]}..." if len(seltext) > 100 else f"Complete partial SQL: {seltext}")
+                    
                     try:
                         self._debug_print_prompt(ai_prompt)
                         ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
                     except Exception as e:
-                        print(f"AI error: {e}")
+                        self._handle_ai_error(e)
+                        ai_sql = None  # Ensure ai_sql is None on error
                     finally:
                         self.ai_response_pending = False
+                    
+                    if ai_sql is None:  # Error occurred
+                        self.input_entry.configure(state="normal")
+                        self.input_var.set("")
+                        return
+                    
                     if not ai_sql or not str(ai_sql).strip():
                         self._warn_once("⚠️ No response generated. Try rephrasing your query.")
                         self.input_entry.configure(state="normal")
@@ -1436,8 +1519,7 @@ Please complete the query using the database schema and ensure it's syntacticall
                         self.input_entry.configure(state="normal")
                         self.input_var.set("")
                         return
-                    # Show user prompt and assistant response
-                    self.add_chat_message("user", f"Complete partial SQL: {seltext[:100]}..." if len(seltext) > 100 else f"Complete partial SQL: {seltext}")
+                    # Show assistant response (user message already added above)
                     merged = f"{banner}{ai_sql_clean}\n"
                     self.add_chat_message("assistant", merged)
                     # Add suggestion with NEW only (no OLD)
@@ -1474,13 +1556,23 @@ Please provide an improved version of this query. Consider:
                 # Call AI
                 ai_sql = None
                 self.ai_response_pending = True
+                # Show user message first
+                self.add_chat_message("user", prompt if prompt else f"Improve query: {seltext[:100]}..." if len(seltext) > 100 else f"Improve query: {seltext}")
+                
                 try:
                     self._debug_print_prompt(ai_prompt)
                     ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
                 except Exception as e:
-                    print(f"AI error: {e}")
+                    self._handle_ai_error(e)
+                    ai_sql = None  # Ensure ai_sql is None on error
                 finally:
                     self.ai_response_pending = False
+                
+                if ai_sql is None:  # Error occurred, skip rest
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    return
+                
                 # Handle empty/missing response
                 if not ai_sql or not str(ai_sql).strip():
                     self._warn_once("⚠️ No response generated. Try rephrasing your query.")
@@ -1499,13 +1591,10 @@ Please provide an improved version of this query. Consider:
                 def _norm(s):
                     return (s or "").strip().rstrip(';').strip()
                 if _norm(ai_sql_clean) == _norm(seltext):
-                    self.add_chat_message("user", prompt if prompt else f"Improve query: {seltext[:100]}..." if len(seltext) > 100 else f"Improve query: {seltext}")
                     self.add_chat_message("assistant", "No changes suggested for this selection.")
                     self.input_entry.configure(state="normal")
                     self.input_var.set("")
                     return
-                # Show user message first
-                self.add_chat_message("user", prompt if prompt else f"Improve query: {seltext[:100]}..." if len(seltext) > 100 else f"Improve query: {seltext}")
                 # Merge banner + SQL as single assistant line before suggestion block
                 merged = f"{banner}{ai_sql_clean}\n"
                 # Determine selection positions (best-effort)
@@ -1617,6 +1706,9 @@ Generate a complete, executable SQL query that fulfills the user's request."""
                     include_highlighted_query=True
                 )
                 
+                # Add user message to chat first
+                self.add_chat_message("user", prompt_text)
+                
                 schema = self._get_formatted_schema()
                 ai_sql = None
                 self.ai_response_pending = True
@@ -1624,11 +1716,16 @@ Generate a complete, executable SQL query that fulfills the user's request."""
                     self._debug_print_prompt(ai_prompt)
                     ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
                 except Exception as e:
-                    print(f"AI error: {e}")
+                    self._handle_ai_error(e)
+                    ai_sql = None  # Ensure ai_sql is None on error
                 finally:
                     self.ai_response_pending = False
-                # Show user instruction then assistant single SQL line
-                self.add_chat_message("user", prompt_text)
+                
+                if ai_sql is None:  # Error occurred
+                    self.input_entry.configure(state="normal")
+                    self.input_var.set("")
+                    return
+                
                 if not ai_sql or not str(ai_sql).strip():
                     self._warn_once("⚠️ No response generated. Try rephrasing your query.")
                     self.input_entry.configure(state="normal")
@@ -1660,6 +1757,9 @@ Otherwise, interpret the request and generate appropriate SQL."""
                 include_highlighted_query=True
             )
             
+            # Add user message to chat first
+            self.add_chat_message("user", prompt_text)
+            
             schema = self._get_formatted_schema()
             ai_sql = None
             self.ai_response_pending = True
@@ -1667,11 +1767,15 @@ Otherwise, interpret the request and generate appropriate SQL."""
                 self._debug_print_prompt(ai_prompt)
                 ai_sql = self.ai_integration.generate_sql_query(ai_prompt, schema)
             except Exception as e:
-                print(f"AI error: {e}")
+                self._handle_ai_error(e)
+                ai_sql = None  # Ensure ai_sql is None on error
             finally:
                 self.ai_response_pending = False
-            # Assistant line should always show user request
-            self.add_chat_message("user", prompt_text)
+            # Error occurred, skip rest of processing
+            if ai_sql is None:
+                self.input_entry.configure(state="normal")
+                self.input_var.set("")
+                return
             if not ai_sql or not str(ai_sql).strip():
                 self._warn_once("⚠️ No response generated. Try rephrasing your query.")
                 self.input_entry.configure(state="normal")

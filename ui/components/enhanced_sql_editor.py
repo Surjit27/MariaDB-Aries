@@ -62,21 +62,21 @@ class EnhancedSQLEditor:
         toolbar_frame = ttk.Frame(self.editor_frame, style="SQL.TFrame")
         toolbar_frame.pack(fill=tk.X, padx=5, pady=2)
         
-        # Toolbar buttons
-        self.create_toolbar_button(toolbar_frame, "▶️", "Run Query", self.run_query, "Run SQL (Ctrl+R)")
-        self.create_toolbar_button(toolbar_frame, "🔧", "Compile", self.compile_sql, "Compile SQL (Ctrl+Shift+C)")
-        self.create_toolbar_button(toolbar_frame, "🧹", "Clear", self.clear_editor, "Clear Editor (Ctrl+C)")
-        self.create_toolbar_button(toolbar_frame, "🤖", "AI Generate", self.generate_sql, "AI Generate (Ctrl+G)")
+        # Toolbar buttons with improved icons
+        self.create_toolbar_button(toolbar_frame, "▶", "Run Query", self.run_query, "Run SQL (Ctrl+R)")
+        self.create_toolbar_button(toolbar_frame, "⚙", "Compile", self.compile_sql, "Compile SQL (Ctrl+Shift+C)")
+        self.create_toolbar_button(toolbar_frame, "🗑", "Clear", self.clear_editor, "Clear Editor (Ctrl+C)")
+        self.create_toolbar_button(toolbar_frame, "✨", "AI Generate", self.generate_sql, "AI Generate (Ctrl+G)")
         self.create_toolbar_button(toolbar_frame, "💬", "AI Chat", self.show_horizontal_ai_modal, "AI Chat Assistant (Ctrl+Shift+A)")
         self.create_toolbar_button(toolbar_frame, "💡", "Explain", self.explain_sql, "Explain SQL")
         
         # Separator
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
         
-        # Editor options
+        # Editor options with improved icons
         self.create_toolbar_button(toolbar_frame, "🎨", "Syntax", self.toggle_syntax, "Toggle Syntax Highlighting")
-        self.create_toolbar_button(toolbar_frame, "🗺️", "Minimap", self.toggle_minimap, "Toggle Minimap")
-        self.create_toolbar_button(toolbar_frame, "🤖", "AI Auto", self.toggle_ai_autocomplete, "Toggle AI Autocomplete")
+        self.create_toolbar_button(toolbar_frame, "🗺", "Minimap", self.toggle_minimap, "Toggle Minimap")
+        self.create_toolbar_button(toolbar_frame, "⚡", "AI Auto", self.toggle_ai_autocomplete, "Toggle AI Autocomplete")
         
         # Separator
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
@@ -89,12 +89,30 @@ class EnhancedSQLEditor:
         self.line_numbers.pack(side=tk.RIGHT, padx=5)
         
     def create_toolbar_button(self, parent, emoji, tooltip, command, full_tooltip):
-        """Create a toolbar button."""
+        """Create a modern, clear toolbar button with improved icons."""
+        # All buttons with consistent modern clear design
         btn = tk.Button(parent, text=emoji, command=command,
-                       bg="#2d2d2d", fg="#ffffff", bd=0,
-                       font=("Arial", 10), width=3, height=1,
-                       activebackground="#404040", activeforeground="#ffffff")
-        btn.pack(side=tk.LEFT, padx=2)
+                       bg="#f8f9fa", fg="#333333", bd=1,
+                       font=("Segoe UI Emoji", 12),
+                       width=3, height=1,
+                       activebackground="#e9ecef", 
+                       activeforeground="#000000",
+                       relief="flat",
+                       cursor="hand2",
+                       padx=4, pady=2,
+                       highlightthickness=0,
+                       borderwidth=1,
+                       highlightbackground="#dee2e6",
+                       highlightcolor="#007acc")
+        # Subtle hover effect
+        def on_enter(e):
+            btn.configure(bg="#e9ecef", bd=1)
+        def on_leave(e):
+            btn.configure(bg="#f8f9fa", bd=1)
+        btn.bind("<Enter>", on_enter)
+        btn.bind("<Leave>", on_leave)
+        
+        btn.pack(side=tk.LEFT, padx=3)
         
         # Add tooltip
         self.create_tooltip(btn, full_tooltip)
@@ -980,11 +998,20 @@ class EnhancedSQLEditor:
                             activebackground="#005a9e", activeforeground="#ffffff")
         copy_btn.pack(side=tk.LEFT, padx=5)
         
-        # Run compiled SQL button
-        run_btn = tk.Button(button_frame, text="▶️ Run Compiled SQL", 
+        # Run compiled SQL button with improved design
+        run_btn = tk.Button(button_frame, text="▶ Run Compiled SQL", 
                            command=lambda: self.run_compiled_sql(compiled_sql, popup),
-                           bg="#28a745", fg="#ffffff", bd=0, font=("Arial", 10),
-                           activebackground="#218838", activeforeground="#ffffff")
+                           bg="#007acc", fg="#ffffff", bd=0, font=("Segoe UI", 11, "bold"),
+                           activebackground="#005a9e", activeforeground="#ffffff",
+                           relief="flat", padx=12, pady=6,
+                           cursor="hand2")
+        # Add hover effect
+        def on_enter(e):
+            run_btn.configure(bg="#0099ff")
+        def on_leave(e):
+            run_btn.configure(bg="#007acc")
+        run_btn.bind("<Enter>", on_enter)
+        run_btn.bind("<Leave>", on_leave)
         run_btn.pack(side=tk.LEFT, padx=5)
         
         # Close button

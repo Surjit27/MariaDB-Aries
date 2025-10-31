@@ -22,13 +22,40 @@ class SettingsManager:
         return self.get_default_settings()
     
     def save_settings(self) -> bool:
-        """Save settings to JSON file."""
+        """Save settings to JSON file with error handling."""
         try:
+            print(f"DEBUG: save_settings called. api_keys count: {len(self.settings.get('api_keys', []))}")
+            
+            # Create directory if it doesn't exist
+            dir_path = os.path.dirname(self.settings_file) if os.path.dirname(self.settings_file) else '.'
+            if dir_path:
+                os.makedirs(dir_path, exist_ok=True)
+            
+            # Write directly to settings file (simpler approach)
             with open(self.settings_file, 'w', encoding='utf-8') as f:
                 json.dump(self.settings, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())  # Force write to disk
+            
+            # Verify the file was written correctly
+            if os.path.exists(self.settings_file):
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
+                    saved_data = json.load(f)
+                    saved_count = len(saved_data.get('api_keys', []))
+                    print(f"DEBUG: Settings file verified. api_keys count in file: {saved_count}")
+                    if saved_count != len(self.settings.get('api_keys', [])):
+                        print(f"DEBUG: WARNING - Mismatch! In-memory: {len(self.settings.get('api_keys', []))}, File: {saved_count}")
+            
             return True
         except IOError as e:
-            print(f"Error saving settings: {e}")
+            print(f"ERROR: Error saving settings: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+        except Exception as e:
+            print(f"ERROR: Unexpected error saving settings: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def get_default_settings(self) -> Dict[str, Any]:
@@ -54,16 +81,30 @@ class SettingsManager:
     
     def add_api_key(self, name: str, api_key: str, provider: str = "gemini") -> bool:
         """Add a new API key."""
+        print(f"DEBUG: add_api_key() called with name='{name}', provider='{provider}'")
+        print(f"DEBUG: Current api_keys before add: {len(self.settings.get('api_keys', []))}")
+        
         if not name or not api_key:
+            print(f"DEBUG: add_api_key failed - missing name or api_key")
             return False
+        
+        # Ensure api_keys list exists
+        if "api_keys" not in self.settings:
+            self.settings["api_keys"] = []
+            print("DEBUG: Created api_keys list")
         
         # Check if name already exists
         for key in self.settings["api_keys"]:
-            if key["name"] == name:
+            if key.get("name") == name:
+                print(f"DEBUG: add_api_key failed - name '{name}' already exists")
                 return False
         
+        # Generate unique ID - use max ID + 1, or 1 if no keys exist
+        max_id = max([key.get("id", 0) for key in self.settings["api_keys"]], default=0)
+        new_id = max_id + 1
+        
         new_key = {
-            "id": len(self.settings["api_keys"]) + 1,
+            "id": new_id,
             "name": name,
             "api_key": api_key,
             "provider": provider,
@@ -72,12 +113,34 @@ class SettingsManager:
         }
         
         self.settings["api_keys"].append(new_key)
+        print(f"DEBUG: Added API key with ID {new_id}, name '{name}'. Total keys in memory: {len(self.settings['api_keys'])}")
+        print(f"DEBUG: New key structure: {new_key}")
         
         # If this is the first key, set it as selected
         if len(self.settings["api_keys"]) == 1:
             self.settings["selected_api_key"] = new_key["id"]
+            print(f"DEBUG: Set as selected key (ID: {new_key['id']})")
         
-        return self.save_settings()
+        # Save to file
+        saved = self.save_settings()
+        print(f"DEBUG: Save settings returned: {saved}")
+        
+        # Verify immediately after save
+        if saved:
+            # Check in-memory
+            in_mem_count = len(self.settings.get('api_keys', []))
+            print(f"DEBUG: After save - in-memory count: {in_mem_count}")
+            
+            # Reload and check file
+            reloaded = self.load_settings()
+            file_count = len(reloaded.get('api_keys', []))
+            print(f"DEBUG: After save - file count: {file_count}")
+            
+            if file_count != in_mem_count:
+                print(f"DEBUG: ERROR - File count mismatch! Retrying save...")
+                saved = self.save_settings()
+        
+        return saved
     
     def update_api_key(self, key_id: int, name: str = None, api_key: str = None) -> bool:
         """Update an existing API key."""

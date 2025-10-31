@@ -1,8 +1,10 @@
 import tkinter as tk
 import ttkbootstrap as ttk
+from tkinter import messagebox
 import os
 from db.enhanced_database_manager import EnhancedDatabaseManager
 from ai.gemini_integration import GeminiIntegration
+from ai.ai_pipeline import AIPipeline
 from utils.session_manager import SessionManager
 from ui.panels.sidebar import SidebarPanel
 from ui.panels.sql_editor import SQLEditorPanel
@@ -35,13 +37,29 @@ class DBMSWorkbench(ttk.Window):
         self.geometry("1200x800")
         self.minsize(768, 600)  # Minimum size for responsive design
         
-        # Set API key from settings or fallback
+        # Set API key from settings - ensure selected API key is loaded properly
         api_key = self.settings_manager.get_api_key_value()
+        print(f"DEBUG: Initialization - Selected API key available: {api_key is not None}")
         if api_key:
+            print(f"DEBUG: Using selected API key (first 10 chars): {api_key[:10]}...")
             os.environ['GEMINI_API_KEY'] = api_key
         else:
-            # Fallback to hardcoded key if no settings
-            os.environ['GEMINI_API_KEY'] = 'AIzaSyCcY01MZsIFwm1li0IAf_pk5knwo6emVjo'
+            # Only use fallback if no API keys are configured at all
+            all_keys = self.settings_manager.get_api_keys()
+            if len(all_keys) == 0:
+                print("DEBUG: No API keys configured, using fallback")
+                os.environ['GEMINI_API_KEY'] = 'AIzaSyCcY01MZsIFwm1li0IAf_pk5knwo6emVjo'
+            else:
+                print("WARNING: API keys exist but none is selected. Auto-selecting first key.")
+                # Try to auto-select the first key
+                first_key = all_keys[0]
+                self.settings_manager.set_selected_api_key(first_key['id'])
+                api_key = first_key.get('api_key')
+                if api_key:
+                    print(f"DEBUG: Auto-selected first API key: {first_key.get('name')}")
+                    os.environ['GEMINI_API_KEY'] = api_key
+                else:
+                    os.environ['GEMINI_API_KEY'] = 'AIzaSyCcY01MZsIFwm1li0IAf_pk5knwo6emVjo'
         
         # Initialize Enhanced Database Manager
         db_storage_path = os.path.join(os.getcwd(), "databases")
@@ -170,14 +188,177 @@ class DBMSWorkbench(ttk.Window):
         self.style.theme_use(theme)
         print(f"Theme changed to: {theme}")
     
+    def _extract_clean_error_message(self, error_str: str) -> str:
+        """Extract clean error message from error string, removing metadata."""
+        import re
+        
+        # Look for message field in Google API error format
+        message_match = re.search(r'message:\s*"([^"]+)"', error_str, re.IGNORECASE)
+        if message_match:
+            return message_match.group(1)
+        
+        # Look for other patterns
+        patterns = [
+            r'"([^"]+API key[^"]+)"',  # API key related messages
+            r'message:\s*([^\n,}]+)',  # message: followed by text
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, error_str, re.IGNORECASE | re.MULTILINE)
+            if match:
+                clean_msg = match.group(1).strip().strip('"')
+                if len(clean_msg) > 10:
+                    return clean_msg
+        
+        # Fallback: return first sentence without metadata
+        sentences = re.split(r'[.!?]\s+', error_str)
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if len(sentence) > 20 and not any(indicator in sentence.lower() for indicator in ['metadata', 'locale', 'key:', 'value:']):
+                return sentence[:200]
+        
+        return error_str[:200] if error_str else "An error occurred"
+    
+    def show_api_key_error_modal(self, error_message: str, error_details: str = None):
+        """Show a user-friendly modal when API key is invalid or wrong."""
+        # Extract clean message from error details if provided
+        clean_message = self._extract_clean_error_message(error_details) if error_details else error_message
+        if error_details:
+            clean_details = self._extract_clean_error_message(error_details)
+        else:
+            clean_details = clean_message
+        
+        modal = tk.Toplevel(self)
+        modal.title("⚠️ Invalid API Key")
+        modal.geometry("550x400")
+        modal.transient(self)
+        modal.grab_set()
+        modal.resizable(False, False)
+        
+        # Center the modal
+        modal.update_idletasks()
+        x = (modal.winfo_screenwidth() // 2) - (550 // 2)
+        y = (modal.winfo_screenheight() // 2) - (400 // 2)
+        modal.geometry(f"550x400+{x}+{y}")
+        
+        # Main frame
+        main_frame = ttk.Frame(modal, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Header with icon
+        header_frame = ttk.Frame(main_frame)
+        header_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        icon_label = ttk.Label(header_frame, text="⚠️", font=("Arial", 32))
+        icon_label.pack()
+        
+        title_label = ttk.Label(header_frame, text="Invalid API Key Detected", 
+                               font=("Arial", 16, "bold"))
+        title_label.pack(pady=(10, 5))
+        
+        # Error message - show only clean message
+        error_frame = ttk.LabelFrame(main_frame, text="Error Message", padding=15)
+        error_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+        
+        error_text = tk.Text(error_frame, height=4, wrap=tk.WORD, 
+                            font=("Arial", 11),
+                            bg="#fff3cd", fg="#856404",
+                            relief=tk.FLAT, padx=10, pady=10)
+        error_text.pack(fill=tk.BOTH, expand=True)
+        error_text.insert("1.0", clean_message if clean_message else clean_details)
+        error_text.config(state=tk.DISABLED)
+        
+        # Instructions
+        instructions_frame = ttk.LabelFrame(main_frame, text="How to Fix", padding=15)
+        instructions_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        instructions_text = """1. Go to Settings → API Keys
+2. Edit or add a new Gemini API key
+3. Make sure the key starts with "AIza..."
+4. Get your API key from: https://aistudio.google.com/apikey"""
+        
+        instructions_label = ttk.Label(instructions_frame, text=instructions_text,
+                                     font=("Arial", 10), justify=tk.LEFT)
+        instructions_label.pack(anchor=tk.W)
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X)
+        
+        def open_settings():
+            modal.destroy()
+            self.show_settings()
+        
+        def close_modal():
+            modal.destroy()
+        
+        settings_btn = ttk.Button(button_frame, text="⚙️ Open Settings", 
+                                  command=open_settings, style="Accent.TButton")
+        settings_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        close_btn = ttk.Button(button_frame, text="Close", command=close_modal)
+        close_btn.pack(side=tk.RIGHT)
+        
+        # Focus on settings button
+        settings_btn.focus()
+    
     def on_api_key_changed(self):
-        """Handle API key change from settings."""
+        """Handle API key change from settings - reinitialize all AI components."""
         api_key = self.settings_manager.get_api_key_value()
+        
+        print(f"DEBUG: on_api_key_changed called. Selected API key available: {api_key is not None}")
         if api_key:
+            print(f"DEBUG: Updating API key (first 10 chars): {api_key[:10]}...")
             os.environ['GEMINI_API_KEY'] = api_key
-            # Reinitialize AI integration with new key
+        else:
+            print("DEBUG: No API key selected, using empty string")
+            os.environ['GEMINI_API_KEY'] = ''
+        
+        # Reinitialize AI integration with new key - catch errors
+        try:
             self.ai_integration = GeminiIntegration()
-            print("API key updated and AI integration reinitialized")
+            
+            # Check if initialization failed
+            if not self.ai_integration.is_available():
+                error_msg = "The API key you provided is invalid or incorrect.\n\nPlease verify your API key in Settings."
+                error_details = "AI initialization failed - the API key may be wrong, expired, or have insufficient permissions."
+                self.show_api_key_error_modal(error_msg, error_details)
+                return
+                
+        except Exception as e:
+            error_msg = f"Failed to initialize AI with the provided API key.\n\nError: {str(e)}"
+            error_details = f"Exception during Gemini initialization: {type(e).__name__}"
+            self.show_api_key_error_modal(error_msg, error_details)
+            return
+        
+        # Reinitialize Modern Modals (they use ai_integration)
+        self.modern_modals = ModernModals(self, self.db_manager, self.ai_integration)
+        
+        # Reinitialize SQL Editor's AI Pipeline if it exists
+        if hasattr(self, 'sql_editor') and self.sql_editor:
+            # Reinitialize AIPipeline with new API key
+            api_key_for_pipeline = os.getenv('GEMINI_API_KEY', '')
+            try:
+                if hasattr(self.sql_editor, 'ai_pipeline'):
+                    self.sql_editor.ai_pipeline = AIPipeline(self.db_manager, api_key_for_pipeline)
+                    
+                    # Check if pipeline is available
+                    if not self.sql_editor.ai_pipeline.is_available():
+                        error_msg = "The API key failed validation for AI Pipeline.\n\nPlease check your API key in Settings."
+                        self.show_api_key_error_modal(error_msg)
+                    else:
+                        print("DEBUG: SQL Editor AI Pipeline reinitialized")
+            except Exception as e:
+                error_msg = f"Failed to initialize AI Pipeline.\n\nError: {str(e)}"
+                self.show_api_key_error_modal(error_msg)
+                return
+            
+            # Also reinitialize HorizontalAIModal if it exists
+            if hasattr(self.sql_editor, 'horizontal_ai_modal') and self.sql_editor.horizontal_ai_modal:
+                self.sql_editor.horizontal_ai_modal.ai_integration = self.ai_integration
+                print("DEBUG: Horizontal AI Modal AI integration updated")
+        
+        print("✅ API key updated and all AI components reinitialized")
     
     def create_favorites_tab(self):
         """Create the favorites tab."""
@@ -710,6 +891,10 @@ WHERE condition;
     def show_settings(self):
         """Show settings tab."""
         self.main_notebook.select(5)  # Settings tab
+        # Refresh API keys when settings panel is shown
+        if hasattr(self, 'settings_panel') and self.settings_panel:
+            # Small delay to ensure tab is visible first
+            self.after(50, lambda: self.settings_panel.refresh_api_keys())
 
     def show_help(self):
         """Show help dialog."""
