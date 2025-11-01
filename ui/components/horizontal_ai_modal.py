@@ -327,6 +327,7 @@ class HorizontalAIModal:
         self.chat_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Text widget with rich text support - white background for black text
+        # Make it read-only so users can't edit the AI responses
         self.chat_text = tk.Text(chat_container, 
                                  bg="#ffffff",  # White background
                                  fg="#000000",  # Black text for visibility
@@ -335,7 +336,8 @@ class HorizontalAIModal:
                                  yscrollcommand=self.chat_scrollbar.set,
                                  highlightthickness=0,
                                  relief="flat",
-                                 bd=0)
+                                 bd=0,
+                                 state=tk.DISABLED)  # Make read-only
         self.chat_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=0, pady=0)
         self.chat_scrollbar.config(command=self.chat_text.yview)
         
@@ -344,6 +346,43 @@ class HorizontalAIModal:
         
         # Button tracking for inline suggestions
         self.inline_buttons = {}
+    
+    def _safe_chat_insert(self, position, text, tags=None):
+        """Safely insert text into read-only chat widget by temporarily enabling it."""
+        try:
+            self.chat_text.config(state=tk.NORMAL)
+            if tags:
+                self.chat_text.insert(position, text, tags)
+            else:
+                self.chat_text.insert(position, text)
+            self.chat_text.config(state=tk.DISABLED)
+        except Exception as e:
+            print(f"Error inserting text into chat: {e}")
+            try:
+                self.chat_text.config(state=tk.DISABLED)  # Ensure it's disabled on error
+            except:
+                pass
+    
+    def _safe_chat_delete(self, start, end):
+        """Safely delete text from read-only chat widget by temporarily enabling it."""
+        try:
+            self.chat_text.config(state=tk.NORMAL)
+            self.chat_text.delete(start, end)
+            self.chat_text.config(state=tk.DISABLED)
+        except Exception as e:
+            print(f"Error deleting text from chat: {e}")
+            try:
+                self.chat_text.config(state=tk.DISABLED)  # Ensure it's disabled on error
+            except:
+                pass
+    
+    def _safe_chat_get(self, start, end):
+        """Safely get text from read-only chat widget."""
+        try:
+            return self.chat_text.get(start, end)
+        except Exception as e:
+            print(f"Error getting text from chat: {e}")
+            return ""
         
     def configure_chat_tags(self):
         """Configure text tags for chat styling."""
@@ -404,7 +443,7 @@ class HorizontalAIModal:
         role_tag = "user_role" if role == "user" else "ai_role"
         
         # Insert role header
-        self.chat_text.insert(tk.END, f"{role_emoji} {role.upper()}: ", role_tag)
+        self._safe_chat_insert(tk.END, f"{role_emoji} {role.upper()}: ", role_tag)
         
         # If suggestion_data is provided AND content is empty, skip showing content
         # (the suggestion block will display it instead)
@@ -417,10 +456,10 @@ class HorizontalAIModal:
         
         # Insert content (only if not duplicated in suggestion block)
         if should_show_content:
-            self.chat_text.insert(tk.END, f"{content}\n", "normal_text")
+            self._safe_chat_insert(tk.END, f"{content}\n", "normal_text")
         else:
             # Just add a newline after the role header
-            self.chat_text.insert(tk.END, "\n", "normal_text")
+            self._safe_chat_insert(tk.END, "\n", "normal_text")
         
         # Record in rolling session context (use content or suggestion's new_code)
         context_content = content
@@ -439,7 +478,12 @@ class HorizontalAIModal:
             self.add_code_suggestion_inline(suggestion_data)
         
         # Scroll to bottom and auto-resize (visual only)
-        self.chat_text.see(tk.END)
+        try:
+            self.chat_text.config(state=tk.NORMAL)
+            self.chat_text.see(tk.END)
+            self.chat_text.config(state=tk.DISABLED)
+        except Exception:
+            pass
         self._auto_resize_chat()
         self._resize_to_content()
     
@@ -504,42 +548,42 @@ class HorizontalAIModal:
             self.highlight_old_code(suggestion_data['old_start'], suggestion_data['old_end'])
         
         # Add separator line
-        self.chat_text.insert(tk.END, "─" * 60 + "\n", "separator")
+        self._safe_chat_insert(tk.END, "─" * 60 + "\n", "separator")
         
         # Add AI Suggestion label
-        self.chat_text.insert(tk.END, "💡 AI Suggestion:\n", "ai_suggestion_label")
+        self._safe_chat_insert(tk.END, "💡 AI Suggestion:\n", "ai_suggestion_label")
         
         # Add explanation if available (from suggestion_data)
         if suggestion_data.get('explanation'):
             explanation = suggestion_data['explanation']
             # Format explanation nicely (wrap to 3-4 lines if needed)
-            self.chat_text.insert(tk.END, f"📝 Explanation: ", "ai_suggestion_label")
-            self.chat_text.insert(tk.END, f"{explanation}\n\n", "normal_text")
+            self._safe_chat_insert(tk.END, f"📝 Explanation: ", "ai_suggestion_label")
+            self._safe_chat_insert(tk.END, f"{explanation}\n\n", "normal_text")
         else:
             # If no explanation provided by AI, add a default brief explanation
             # This helps users understand what the query does
             if suggestion_data.get('new_code'):
-                self.chat_text.insert(tk.END, f"📝 Explanation: ", "ai_suggestion_label")
+                self._safe_chat_insert(tk.END, f"📝 Explanation: ", "ai_suggestion_label")
                 default_explanation = "This SQL query will be inserted into your editor. Review it and click Keep to apply or Reject to discard."
-                self.chat_text.insert(tk.END, f"{default_explanation}\n\n", "normal_text")
+                self._safe_chat_insert(tk.END, f"{default_explanation}\n\n", "normal_text")
         
         # Add old code (if exists) - only show if there's existing code to replace
         if suggestion_data.get('old_code') and suggestion_data['old_code']:
             old_code = suggestion_data['old_code']
             if len(old_code) > 100:
                 old_code = old_code[:100] + "..."
-            self.chat_text.insert(tk.END, f"OLD: ", "ai_suggestion_label")
-            self.chat_text.insert(tk.END, f"{old_code}\n", "old_code")
+            self._safe_chat_insert(tk.END, f"OLD: ", "ai_suggestion_label")
+            self._safe_chat_insert(tk.END, f"{old_code}\n", "old_code")
         
         # Add new code - this should always exist
         if suggestion_data.get('new_code'):
             new_code = suggestion_data['new_code']
             # Always show NEW label even if no OLD
-            self.chat_text.insert(tk.END, f"NEW: ", "ai_suggestion_label")
-            self.chat_text.insert(tk.END, f"{new_code}\n", "new_code")
+            self._safe_chat_insert(tk.END, f"NEW: ", "ai_suggestion_label")
+            self._safe_chat_insert(tk.END, f"{new_code}\n", "new_code")
         
         # Tight spacer before buttons
-        self.chat_text.insert(tk.END, "\n", "normal_text")
+        self._safe_chat_insert(tk.END, "\n", "normal_text")
         
         # Create compact text-like buttons (no box background)
         keep_btn = tk.Button(self.chat_text,
@@ -571,19 +615,28 @@ class HorizontalAIModal:
         
         # Insert buttons inline using window_create (compact spacing)
         # Store the position before inserting buttons so we can replace them later
-        button_start_pos = self.chat_text.index(tk.END)
-        
-        keep_btn_ref = keep_btn
-        discard_btn_ref = discard_btn
-        # Now that refs exist, bind commands
-        keep_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_keep_action(s, kb, rb, button_start_pos))
-        discard_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_reject_action(s, kb, rb, button_start_pos))
+        try:
+            self.chat_text.config(state=tk.NORMAL)
+            button_start_pos = self.chat_text.index(tk.END)
+            
+            keep_btn_ref = keep_btn
+            discard_btn_ref = discard_btn
+            # Now that refs exist, bind commands
+            keep_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_keep_action(s, kb, rb, button_start_pos))
+            discard_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_reject_action(s, kb, rb, button_start_pos))
 
-        self.chat_text.window_create(tk.END, window=keep_btn_ref)
-        self.chat_text.insert(tk.END, "    ")
-        self.chat_text.window_create(tk.END, window=discard_btn_ref)
-        button_end_pos = self.chat_text.index(tk.END)
-        self.chat_text.insert(tk.END, "\n", "normal_text")
+            self.chat_text.window_create(tk.END, window=keep_btn_ref)
+            self.chat_text.insert(tk.END, "    ")
+            self.chat_text.window_create(tk.END, window=discard_btn_ref)
+            button_end_pos = self.chat_text.index(tk.END)
+            self.chat_text.insert(tk.END, "\n", "normal_text")
+            self.chat_text.config(state=tk.DISABLED)
+        except Exception as e:
+            print(f"Error inserting buttons: {e}")
+            try:
+                self.chat_text.config(state=tk.DISABLED)
+            except:
+                pass
         
         # Store button references for tracking
         suggestion_id = f"suggestion_{len(self.chat_messages)}"
@@ -661,8 +714,9 @@ class HorizontalAIModal:
                 button_end_pos = self.chat_text.index(f"{button_start_pos}+1c")  # Approximate end
                 # Try to find where buttons actually end
                 try:
+                    self.chat_text.config(state=tk.NORMAL)
                     # Find the end of button area by looking for the next newline
-                    content = self.chat_text.get(button_start_pos, f"{button_start_pos} lineend")
+                    content = self._safe_chat_get(button_start_pos, f"{button_start_pos} lineend")
                     if "    " in content or "\n" in content:
                         # Buttons are on this line, replace up to newline
                         line_end = self.chat_text.index(f"{button_start_pos} lineend")
@@ -673,12 +727,14 @@ class HorizontalAIModal:
                 except Exception:
                     # Fallback: just delete a chunk
                     try:
+                        self.chat_text.config(state=tk.NORMAL)
                         self.chat_text.delete(button_start_pos, f"{button_start_pos}+50c")
                     except Exception:
                         pass
                 
                 # Insert "Query accepted" text (no margin, use normal_text like other text)
                 self.chat_text.insert(button_start_pos, "✅ Query accepted\n", "normal_text")
+                self.chat_text.config(state=tk.DISABLED)
             except Exception as e:
                 print(f"Error removing buttons: {e}")
             
@@ -706,8 +762,9 @@ class HorizontalAIModal:
                 button_end_pos = self.chat_text.index(f"{button_start_pos}+1c")  # Approximate end
                 # Try to find where buttons actually end
                 try:
+                    self.chat_text.config(state=tk.NORMAL)
                     # Find the end of button area by looking for the next newline
-                    content = self.chat_text.get(button_start_pos, f"{button_start_pos} lineend")
+                    content = self._safe_chat_get(button_start_pos, f"{button_start_pos} lineend")
                     if "    " in content or "\n" in content:
                         # Buttons are on this line, replace up to newline
                         line_end = self.chat_text.index(f"{button_start_pos} lineend")
@@ -718,12 +775,14 @@ class HorizontalAIModal:
                 except Exception:
                     # Fallback: just delete a chunk
                     try:
+                        self.chat_text.config(state=tk.NORMAL)
                         self.chat_text.delete(button_start_pos, f"{button_start_pos}+50c")
                     except Exception:
                         pass
                 
                 # Insert "Query rejected" text (no margin, use normal_text like other text)
                 self.chat_text.insert(button_start_pos, "❌ Query rejected\n", "normal_text")
+                self.chat_text.config(state=tk.DISABLED)
             except Exception as e:
                 print(f"Error removing buttons: {e}")
             
@@ -779,8 +838,13 @@ class HorizontalAIModal:
     
     def add_confirmation_message(self, message):
         """Add a confirmation message to chat."""
-        self.chat_text.insert(tk.END, f"{message}\n\n", "separator")
-        self.chat_text.see(tk.END)
+        self._safe_chat_insert(tk.END, f"{message}\n\n", "separator")
+        try:
+            self.chat_text.config(state=tk.NORMAL)
+            self.chat_text.see(tk.END)
+            self.chat_text.config(state=tk.DISABLED)
+        except Exception:
+            pass
     
     def add_confirmation_with_optimize_again(self, start_pos, end_pos, query_text):
         """Add confirmation message with Optimize Again button."""
@@ -821,10 +885,19 @@ class HorizontalAIModal:
             optimize_btn.configure(command=optimize_again)
             
             # Insert button inline (no spacing before - align to margin like other text)
-            self.chat_text.insert(tk.END, " ", "normal_text")  # Just a single space
-            self.chat_text.window_create(tk.END, window=optimize_btn)
-            self.chat_text.insert(tk.END, "\n", "normal_text")
-            self.chat_text.see(tk.END)
+            try:
+                self.chat_text.config(state=tk.NORMAL)
+                self.chat_text.insert(tk.END, " ", "normal_text")  # Just a single space
+                self.chat_text.window_create(tk.END, window=optimize_btn)
+                self.chat_text.insert(tk.END, "\n", "normal_text")
+                self.chat_text.see(tk.END)
+                self.chat_text.config(state=tk.DISABLED)
+            except Exception as e:
+                print(f"Error inserting optimize button: {e}")
+                try:
+                    self.chat_text.config(state=tk.DISABLED)
+                except:
+                    pass
         except Exception as e:
             print(f"Error adding optimize again button: {e}")
             # Don't show duplicate message on error - "Query accepted" is already shown
@@ -2372,6 +2445,8 @@ Otherwise, interpret the request and generate appropriate SQL."""
     def _auto_resize_chat(self):
         """Adjust modal height based on chat content up to a max, to keep UI compact."""
         try:
+            # Temporarily enable to get metrics
+            self.chat_text.config(state=tk.NORMAL)
             # Prefer precise pixel count for full content height
             total_pixels = 0
             try:
@@ -2380,9 +2455,11 @@ Otherwise, interpret the request and generate appropriate SQL."""
                 # Fallback to last line metrics if count unsupported
                 info = self.chat_text.dlineinfo("end-1c")
                 if not info:
+                    self.chat_text.config(state=tk.DISABLED)
                     return
                 _, y, _, h, _, _ = info
                 total_pixels = y + h + 6
+            self.chat_text.config(state=tk.DISABLED)
             current_height = self.modal_window.winfo_height()
             extra = max(total_pixels, self._min_chat_extra_px)
             target_extra = min(extra, self._max_chat_extra_px)
@@ -2390,7 +2467,10 @@ Otherwise, interpret the request and generate appropriate SQL."""
             if abs(current_height - target_height) > 4:
                 self.modal_window.after_idle(lambda: self.modal_window.wm_geometry(f"{self.modal_width}x{target_height}"))
         except Exception:
-            pass
+            try:
+                self.chat_text.config(state=tk.DISABLED)
+            except:
+                pass
 
     def _resize_to_content(self):
         """Public helper to trigger content-based resize after UI settles (visual only)."""

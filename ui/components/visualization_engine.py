@@ -2,6 +2,7 @@
 Visualization Engine
 Creates charts from data using matplotlib
 """
+from __future__ import annotations
 
 try:
     import matplotlib
