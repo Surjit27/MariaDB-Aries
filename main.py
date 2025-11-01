@@ -942,7 +942,7 @@ For more help, check the documentation.
         """Show about dialog."""
         from tkinter import messagebox
         messagebox.showinfo("About", 
-            "Offline PostgreSQL-Style DBMS Workbench\n\n"
+            "Offline MariaDB:aries version DBMS Workbench\n\n"
             "Version: 1.0\n"
             "A powerful database management tool with AI integration\n"
             "Built with Python, Tkinter, and SQLite")

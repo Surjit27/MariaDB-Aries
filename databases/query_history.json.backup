@@ -138,5 +138,75 @@
     "status": "success",
     "database": "pokemon_world",
     "id": 20
+  },
+  {
+    "query": "SELECT * FROM battle WHERE location = 'Gym'",
+    "timestamp": "2025-11-01T23:40:47.285665",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 21
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT * FROM battle WHERE location = 'Gym';",
+    "timestamp": "2025-11-01T23:40:47.293737",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 22
+  },
+  {
+    "query": "SELECT * FROM battle WHERE location = 'Gym' AND winner_trainer_id IN (13, 46)",
+    "timestamp": "2025-11-01T23:41:18.715915",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 23
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT * FROM battle WHERE location = 'Gym' AND winner_trainer_id IN (13, 46);",
+    "timestamp": "2025-11-01T23:41:18.721864",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 24
+  },
+  {
+    "query": "SELECT * FROM pokemon WHERE name = 'Pikachu'",
+    "timestamp": "2025-11-01T23:45:11.092751",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 25
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT * FROM pokemon WHERE name = 'Pikachu';",
+    "timestamp": "2025-11-01T23:45:11.100685",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 26
+  },
+  {
+    "query": "SELECT * FROM pokemon WHERE name = 'Pikachu'",
+    "timestamp": "2025-11-01T23:47:01.388436",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 27
+  },
+  {
+    "query": "SELECT * FROM pokemon WHERE name = 'Pikachu';",
+    "timestamp": "2025-11-01T23:47:01.391657",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 28
+  },
+  {
+    "query": "SELECT * FROM pokemon WHERE name = 'Pikachu'",
+    "timestamp": "2025-11-01T23:47:54.065661",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 29
+  },
+  {
+    "query": "SELECT * FROM pokemon WHERE name = 'Pikachu';",
+    "timestamp": "2025-11-01T23:47:54.080724",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 30
   }
 ]
