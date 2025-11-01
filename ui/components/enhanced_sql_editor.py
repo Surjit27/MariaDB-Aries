@@ -29,6 +29,11 @@ class EnhancedSQLEditor:
         self.autocomplete_suggestions = []
         self.suggestion_window = None
         
+        # Store current query results for dashboard
+        self.current_query = ""
+        self.current_query_columns = []
+        self.current_query_data = []
+        
         # Initialize SQL compiler
         self.sql_compiler = SimpleSQLCompiler()
         
@@ -39,6 +44,9 @@ class EnhancedSQLEditor:
         
         # Horizontal AI Modal (will be initialized when needed)
         self.horizontal_ai_modal = None
+        
+        # Dashboard panel reference (set from main)
+        self.dashboard_panel = None
         
         self.create_widgets()
         
@@ -69,6 +77,12 @@ class EnhancedSQLEditor:
         self.create_toolbar_button(toolbar_frame, "✨", "AI Generate", self.generate_sql, "AI Generate (Ctrl+G)")
         self.create_toolbar_button(toolbar_frame, "💬", "AI Chat", self.show_horizontal_ai_modal, "AI Chat Assistant (Ctrl+Shift+A)")
         self.create_toolbar_button(toolbar_frame, "💡", "Explain", self.explain_sql, "Explain SQL")
+        
+        # Separator
+        ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        
+        # Dashboard button
+        self.create_toolbar_button(toolbar_frame, "📊", "Dashboard", self.generate_dashboard, "Generate Dashboard with AI")
         
         # Separator
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
@@ -794,9 +808,20 @@ class EnhancedSQLEditor:
                             elif columns and data is not None:
                                 # Display the actual table data
                                 self.results_viewer.display_results(columns, data)
+                                # Store query results for dashboard
+                                self.current_query = query
+                                self.current_query_columns = columns
+                                self.current_query_data = data
+                                # Update dashboard if available
+                                if hasattr(self, 'dashboard_panel') and self.dashboard_panel:
+                                    self.dashboard_panel.set_query_results(query, columns, data)
                             else:
                                 # No data returned (e.g., INSERT, UPDATE, DELETE)
                                 self.results_viewer.display_results(['Message'], [['Query executed successfully']])
+                                # Clear dashboard data for non-SELECT queries
+                                self.current_query = ""
+                                self.current_query_columns = []
+                                self.current_query_data = []
                         elif isinstance(result, tuple) and len(result) == 2:
                             # Result is (columns, data) - legacy format
                             columns, data = result
@@ -1133,6 +1158,47 @@ class EnhancedSQLEditor:
     def set_sidebar(self, sidebar):
         """Set reference to sidebar."""
         self.sidebar = sidebar
+    
+    def set_dashboard_panel(self, dashboard_panel):
+        """Set reference to dashboard panel."""
+        self.dashboard_panel = dashboard_panel
+        # If we already have query results, set them in the dashboard
+        if self.current_query_data:
+            self.dashboard_panel.set_query_results(
+                self.current_query,
+                self.current_query_columns,
+                self.current_query_data
+            )
+    
+    def generate_dashboard(self):
+        """Generate dashboard from current query results."""
+        if not self.current_query_data or not self.current_query_columns:
+            from tkinter import messagebox
+            messagebox.showwarning("No Data", 
+                                 "No query results available.\n\n"
+                                 "Please run a SQL query first and then generate the dashboard.")
+            return
+        
+        # Switch to dashboard tab if available
+        if hasattr(self, 'dashboard_panel') and self.dashboard_panel:
+            # Find the main window and switch to dashboard tab
+            root = self.editor.winfo_toplevel()
+            if hasattr(root, 'main_notebook'):
+                # Find dashboard tab index
+                tab_count = root.main_notebook.index("end")
+                for i in range(tab_count):
+                    tab_text = root.main_notebook.tab(i, "text")
+                    if "Dashboard" in tab_text or "AI Dashboard" in tab_text:
+                        root.main_notebook.select(i)
+                        break
+                # Generate dashboard
+                self.dashboard_panel.generate_dashboard()
+            else:
+                self.dashboard_panel.generate_dashboard()
+        else:
+            from tkinter import messagebox
+            messagebox.showwarning("Dashboard Not Available", 
+                                 "Dashboard panel is not initialized.")
     
     def show_horizontal_ai_modal(self, initial_text=None):
         """Show the horizontal AI modal with highlighted query if available."""

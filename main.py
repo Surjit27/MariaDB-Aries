@@ -18,6 +18,7 @@ from ui.components.vscode_sidebar_new import VSCodeSidebar
 from ui.components.enhanced_sql_editor import EnhancedSQLEditor
 from ui.components.modern_modals import ModernModals
 from ui.components.settings_panel import SettingsPanel
+from ui.components.ai_dashboard_panel import AIDashboardPanel
 from utils.data_export_import import DataExportImport
 from utils.settings_manager import SettingsManager
 
@@ -149,6 +150,15 @@ class DBMSWorkbench(ttk.Window):
         self.schema_visualizer = SchemaVisualizer(self.schema_tab, self.db_manager)
         self.schema_visualizer.pack(fill=tk.BOTH, expand=True)
         
+        # AI Dashboard Tab
+        self.dashboard_tab = ttk.Frame(self.main_notebook)
+        self.main_notebook.add(self.dashboard_tab, text="📊 AI Dashboard")
+        self.ai_dashboard = AIDashboardPanel(self.dashboard_tab, self.db_manager, self.ai_integration)
+        self.ai_dashboard.pack(fill=tk.BOTH, expand=True)
+        
+        # Connect SQL Editor to Dashboard Panel
+        self.sql_editor.set_dashboard_panel(self.ai_dashboard)
+        
         # Settings Tab
         self.settings_tab = ttk.Frame(self.main_notebook)
         self.main_notebook.add(self.settings_tab, text="⚙️ Settings")
@@ -180,7 +190,8 @@ class DBMSWorkbench(ttk.Window):
         self.bind("<Control-3>", lambda event: self.main_notebook.select(2))  # History
         self.bind("<Control-4>", lambda event: self.main_notebook.select(3))  # Favorites
         self.bind("<Control-5>", lambda event: self.main_notebook.select(4))  # Schema
-        self.bind("<Control-6>", lambda event: self.main_notebook.select(5))  # Settings
+        self.bind("<Control-6>", lambda event: self.main_notebook.select(5))  # AI Dashboard
+        self.bind("<Control-7>", lambda event: self.main_notebook.select(6))  # Settings
     
     def on_theme_changed(self, theme: str):
         """Handle theme change from settings."""
@@ -609,7 +620,7 @@ Recent Queries:
     def on_tab_changed(self, event):
         """Handle tab change event."""
         current_tab = self.main_notebook.index("current")
-        tab_names = ["SQL Editor", "Query Builder", "History", "Favorites", "Schema", "Settings"]
+        tab_names = ["SQL Editor", "Query Builder", "History", "Favorites", "Schema", "AI Dashboard", "Settings"]
         current_tab_name = tab_names[current_tab] if current_tab < len(tab_names) else "Unknown"
         
         # Update status bar

@@ -152,69 +152,152 @@ class EnhancedDatabaseManager:
             return [], [], error_msg
 
     def _execute_multiple_statements(self, statements: List[str]) -> Tuple[List[str], List[Any], Optional[str]]:
-        """Execute multiple SQL statements."""
-        if not self.connection or not self.cursor:
-            return [], [], "No database is currently open. Please create and open a database first."
+        """Execute multiple SQL statements with proper error handling and database switching."""
+        results = []
+        column_names = []
+        executed_count = 0
+        errors = []
         
-        try:
-            results = []
-            column_names = []
-            executed_count = 0
+        for i, statement in enumerate(statements):
+            statement = statement.strip()
+            if not statement:
+                continue
             
-            for i, statement in enumerate(statements):
-                statement = statement.strip()
-                if not statement:
+            print(f"Executing statement {i+1}/{len(statements)}: {statement[:50]}...")
+            
+            # Check for special commands that need to be handled first
+            statement_upper = statement.upper().strip()
+            
+            # Handle CREATE DATABASE
+            if statement_upper.startswith("CREATE DATABASE"):
+                db_name = self._extract_database_name(statement)
+                if db_name:
+                    if self.create_database(db_name):
+                        executed_count += 1
+                        continue
+                    else:
+                        error_msg = f"Statement {i+1}: Failed to create database '{db_name}'"
+                        errors.append(error_msg)
+                        print(error_msg)
+                        continue
+                else:
+                    error_msg = f"Statement {i+1}: Invalid CREATE DATABASE syntax"
+                    errors.append(error_msg)
+                    continue
+            
+            # Handle USE DATABASE - this switches the active database
+            if statement_upper.startswith("USE"):
+                db_name = self._extract_database_name(statement)
+                if db_name:
+                    if self.open_database(db_name):
+                        executed_count += 1
+                        print(f"Switched to database: {db_name}")
+                        continue
+                    else:
+                        error_msg = f"Statement {i+1}: Failed to open database '{db_name}'"
+                        errors.append(error_msg)
+                        print(error_msg)
+                        continue
+                else:
+                    error_msg = f"Statement {i+1}: Invalid USE DATABASE syntax"
+                    errors.append(error_msg)
+                    continue
+            
+            # Handle DROP DATABASE
+            if statement_upper.startswith("DROP DATABASE"):
+                db_name = self._extract_database_name(statement)
+                if db_name:
+                    if self.drop_database(db_name):
+                        executed_count += 1
+                        continue
+                    else:
+                        error_msg = f"Statement {i+1}: Failed to drop database '{db_name}'"
+                        errors.append(error_msg)
+                        continue
+                else:
+                    error_msg = f"Statement {i+1}: Invalid DROP DATABASE syntax"
+                    errors.append(error_msg)
+                    continue
+            
+            # For other queries, need an open database
+            if not self.connection or not self.cursor:
+                error_msg = f"Statement {i+1}: No database is currently open. Please create and open a database first."
+                errors.append(error_msg)
+                print(error_msg)
+                continue
+            
+            try:
+                # Compile the SQL query
+                compiled_query = self.sql_compiler.compile_sql(statement)
+                
+                # Skip if compiled query is empty (e.g., COMMENT ON statements)
+                if not compiled_query or not compiled_query.strip():
+                    print(f"Statement {i+1}: Skipped (empty after compilation)")
                     continue
                 
-                print(f"Executing statement {i+1}: {statement[:50]}...")
-                
-                try:
-                    # Compile the SQL query
-                    compiled_query = self.sql_compiler.compile_sql(statement)
-                    print(f"Compiled: {compiled_query[:100]}...")
-                    
-                    # Skip if compiled query is empty (e.g., COMMENT ON statements)
-                    if not compiled_query or not compiled_query.strip():
-                        continue
-                    
-                    # Execute query
+                # Handle compiled queries that contain multiple statements (e.g., DROP VIEW IF EXISTS; CREATE VIEW)
+                if ';' in compiled_query:
+                    compiled_statements = self._split_sql_statements(compiled_query)
+                    for compiled_stmt in compiled_statements:
+                        compiled_stmt = compiled_stmt.strip()
+                        if compiled_stmt:
+                            self.cursor.execute(compiled_stmt)
+                            executed_count += 1
+                else:
+                    # Execute single compiled query
                     self.cursor.execute(compiled_query)
                     executed_count += 1
-                    
-                    # If it's a SELECT statement, collect results
-                    if statement.upper().startswith("SELECT"):
-                        if not column_names:  # First SELECT statement
+                
+                # If it's a SELECT statement, collect results
+                if statement_upper.startswith("SELECT"):
+                    if not column_names:  # First SELECT statement
+                        if self.cursor.description:
                             column_names = [description[0] for description in self.cursor.description]
+                    if self.cursor.description:
                         results.extend(self.cursor.fetchall())
+                
+                # Commit after each statement to ensure changes are saved
+                self.connection.commit()
                         
-                except sqlite3.Error as e:
-                    print(f"Error in statement {i+1}: {e}")
-                    # Continue with other statements
-                    continue
-            
-            # Commit all changes
-            self.connection.commit()
-            
-            # Reload schema if any CREATE/ALTER/DROP statements were executed
-            if any(stmt.strip().upper().startswith(("CREATE", "ALTER", "DROP")) for stmt in statements):
+            except sqlite3.Error as e:
+                error_msg = f"Statement {i+1}: {str(e)}"
+                errors.append(error_msg)
+                print(f"Error in statement {i+1}: {e}")
+                # Rollback the transaction for this statement
                 try:
-                    self.load_database_schema()
+                    self.connection.rollback()
                 except:
                     pass
-            
-            # Add to history
-            self.add_to_history("; ".join(statements), "success")
-            
+                # Continue with other statements (non-fatal)
+                continue
+            except Exception as e:
+                error_msg = f"Statement {i+1}: Unexpected error - {str(e)}"
+                errors.append(error_msg)
+                print(f"Unexpected error in statement {i+1}: {e}")
+                continue
+        
+        # Reload schema if any CREATE/ALTER/DROP statements were executed
+        if any(stmt.strip().upper().startswith(("CREATE", "ALTER", "DROP")) for stmt in statements):
+            try:
+                self.load_database_schema()
+            except:
+                pass
+        
+        # Add to history
+        self.add_to_history("; ".join(statements), "success" if not errors else f"partial: {len(errors)} errors")
+        
+        # Return results with error messages if any
+        if errors:
+            error_summary = f"Executed {executed_count}/{len([s for s in statements if s.strip()])} statements. Errors: {'; '.join(errors[:3])}" + (f" (+{len(errors)-3} more)" if len(errors) > 3 else "")
+            if results:
+                return column_names, results, error_summary
+            else:
+                return [], [], error_summary
+        else:
             if results:
                 return column_names, results, None
             else:
-                return [], [], f"Executed {executed_count} statements successfully"
-                
-        except Exception as e:
-            error_msg = f"Error executing multiple statements: {e}"
-            print(error_msg)
-            self.add_to_history("; ".join(statements), f"error: {e}")
-            return [], [], error_msg
+                return [], [], f"✅ Successfully executed {executed_count} statements"
 
     def add_to_history(self, query: str, status: str):
         """Add query to history."""
@@ -273,11 +356,13 @@ class EnhancedDatabaseManager:
             
             # Check if database already exists
             if os.path.exists(db_path):
-                print(f"Database {db_name} already exists")
-                return False
+                print(f"Database {db_name} already exists - will use existing database")
+                return True  # Return True to allow using existing database
             
             # Create the database file by connecting to it
             temp_conn = sqlite3.connect(db_path)
+            # Enable foreign keys
+            temp_conn.execute("PRAGMA foreign_keys = ON")
             temp_conn.close()
             
             print(f"Database {db_name} created successfully at {db_path}")
@@ -671,6 +756,22 @@ class EnhancedDatabaseManager:
 
     def _split_sql_statements(self, query: str) -> List[str]:
         """Split SQL statements by semicolon, handling strings and comments."""
+        import re
+        
+        # First, remove comments (but preserve structure for splitting)
+        # Remove single-line comments
+        lines = query.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            # Remove single-line comments (-- style)
+            line = re.sub(r'--.*$', '', line)
+            if line.strip():  # Keep non-empty lines
+                cleaned_lines.append(line)
+        query = '\n'.join(cleaned_lines)
+        
+        # Remove multi-line comments (/* */ style)
+        query = re.sub(r'/\*.*?\*/', '', query, flags=re.DOTALL)
+        
         statements = []
         current = ""
         in_string = False
@@ -681,10 +782,12 @@ class EnhancedDatabaseManager:
             char = query[i]
             
             if not in_string:
+                # Check for start of string
                 if char in ["'", '"']:
                     in_string = True
                     string_char = char
                     current += char
+                # Check for semicolon (statement separator)
                 elif char == ';':
                     stmt = current.strip()
                     if stmt:
@@ -693,14 +796,21 @@ class EnhancedDatabaseManager:
                 else:
                     current += char
             else:
+                # Inside string
                 current += char
                 if char == string_char:
                     # Check if it's escaped
                     if i > 0 and query[i-1] == '\\':
                         pass  # Escaped quote, continue
                     else:
-                        in_string = False
-                        string_char = None
+                        # Check if it's double quote (escaped quote in SQL)
+                        if i + 1 < len(query) and query[i+1] == string_char:
+                            # Double quote is escaped single quote
+                            current += query[i+1]
+                            i += 1
+                        else:
+                            in_string = False
+                            string_char = None
             
             i += 1
         
