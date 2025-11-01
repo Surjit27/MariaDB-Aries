@@ -326,10 +326,10 @@ class HorizontalAIModal:
         self.chat_scrollbar = tk.Scrollbar(chat_container)
         self.chat_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Text widget with rich text support
+        # Text widget with rich text support - white background for black text
         self.chat_text = tk.Text(chat_container, 
-                                 bg="#1e1e1e", 
-                                 fg="#ffffff",
+                                 bg="#ffffff",  # White background
+                                 fg="#000000",  # Black text for visibility
                                  font=("Consolas", 9),
                                  wrap=tk.WORD,
                                  yscrollcommand=self.chat_scrollbar.set,
@@ -357,9 +357,9 @@ class HorizontalAIModal:
                                      font=("Arial", 9, "bold"),
                                      spacing1=1, spacing2=1, spacing3=2)
         
-        # Content tags
+        # Content tags - black text for better visibility on white background
         self.chat_text.tag_configure("normal_text", 
-                                     foreground="#ffffff", 
+                                     foreground="#000000",  # Black text
                                      font=("Consolas", 9),
                                      spacing1=1, spacing2=1, spacing3=2)
         
@@ -639,15 +639,32 @@ class HorizontalAIModal:
             pass
 
     def _compact_reject_action(self, suggestion_data, keep_btn_ref, discard_btn_ref):
+        """Handle reject action - discard suggestion."""
         try:
+            # Disable buttons immediately to prevent double-clicking
+            try:
+                discard_btn_ref.config(state=tk.DISABLED)
+                keep_btn_ref.config(state=tk.DISABLED)
+            except Exception:
+                pass
+            
+            # Call the main handler
             self.handle_discard_suggestion(suggestion_data)
+            
+            # Update button appearance after rejection
+            try:
+                discard_btn_ref.config(text="Query rejected", state=tk.DISABLED, fg="#dc3545", font=("Arial", 9))
+                keep_btn_ref.config(state=tk.DISABLED)
+            except Exception as e:
+                print(f"Error updating reject button: {e}")
+        except Exception as e:
+            print(f"Error in reject action: {e}")
+            # Still try to disable buttons even if handler fails
             try:
                 discard_btn_ref.config(text="Query rejected", state=tk.DISABLED, fg="#dc3545", font=("Arial", 9))
                 keep_btn_ref.config(state=tk.DISABLED)
             except Exception:
                 pass
-        except Exception:
-            pass
 
     # Removed inline Insert/Undo bar per new compact UX
     
@@ -666,11 +683,25 @@ class HorizontalAIModal:
     def disable_suggestion_buttons(self, suggestion_data):
         """Disable the Keep/Discard buttons after action."""
         try:
+            # Match by comparing key fields that uniquely identify the suggestion
             for btn_id, btn_info in self.inline_buttons.items():
-                if btn_info['data'] == suggestion_data:
-                    btn_info['keep'].config(state=tk.DISABLED)
-                    btn_info['discard'].config(state=tk.DISABLED)
-                    break
+                stored_data = btn_info.get('data', {})
+                # Compare by key fields (new_code is the most reliable identifier)
+                if stored_data.get('new_code') == suggestion_data.get('new_code'):
+                    # Additional checks to ensure it's the right suggestion (if available)
+                    old_code_match = (stored_data.get('old_code') == suggestion_data.get('old_code'))
+                    old_start_match = (stored_data.get('old_start') == suggestion_data.get('old_start'))
+                    old_end_match = (stored_data.get('old_end') == suggestion_data.get('old_end'))
+                    
+                    # Match if new_code matches AND (all other fields match OR old_code fields are None/missing)
+                    if (old_code_match and old_start_match and old_end_match) or \
+                       (not suggestion_data.get('old_code') and not stored_data.get('old_code')):
+                        try:
+                            btn_info['keep'].config(state=tk.DISABLED)
+                            btn_info['discard'].config(state=tk.DISABLED)
+                        except Exception as e:
+                            print(f"Error disabling button: {e}")
+                        break
         except Exception as e:
             print(f"Error disabling buttons: {e}")
     

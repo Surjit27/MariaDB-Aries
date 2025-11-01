@@ -15,6 +15,7 @@ from ui.components.modern_theme import ModernTheme
 from sql_engine.simple_sql_compiler import SimpleSQLCompiler
 from ai.ai_pipeline import AIPipeline
 from ui.components.horizontal_ai_modal import HorizontalAIModal
+from ui.components.query_explanation_tooltip import QueryExplanationTooltip
 
 class EnhancedSQLEditor:
     def __init__(self, parent, db_manager, ai_integration):
@@ -47,6 +48,9 @@ class EnhancedSQLEditor:
         
         # Dashboard panel reference (set from main)
         self.dashboard_panel = None
+        
+        # Query explanation tooltip (will be initialized when needed)
+        self.explanation_tooltip = None
         
         self.create_widgets()
         
@@ -488,12 +492,20 @@ class EnhancedSQLEditor:
                 self.status_label.configure(text=f"'{search_text}' not found")
     
     def get_query_for_ai(self):
-        """Get highlighted query or all query text for AI operations.
+        """Get selected query or all query text for AI operations.
+        Priority: 1. Selected text (tk.SEL), 2. Manual highlight, 3. All editor content
         Returns tuple: (query_text, is_highlighted)"""
         try:
-            # Check for highlighted text first
-            highlight_ranges = self.editor.tag_ranges("manual_highlight")
+            # Priority 1: Check for actual text selection (tk.SEL)
+            selection_ranges = self.editor.tag_ranges(tk.SEL)
+            if selection_ranges:
+                # Extract selected text
+                selected_text = self.editor.get(tk.SEL_FIRST, tk.SEL_LAST).strip()
+                if selected_text:
+                    return selected_text, True
             
+            # Priority 2: Check for manually highlighted text (manual_highlight tag)
+            highlight_ranges = self.editor.tag_ranges("manual_highlight")
             if highlight_ranges:
                 # Extract all highlighted text segments and combine them
                 highlighted_segments = []
@@ -509,7 +521,7 @@ class EnhancedSQLEditor:
                     combined_query = "\n".join(highlighted_segments)
                     return combined_query, True
             
-            # No highlighted text, return all editor content
+            # Priority 3: No selection or highlight, return all editor content
             all_text = self.editor.get("1.0", tk.END).strip()
             return all_text, False
             
@@ -1129,21 +1141,40 @@ class EnhancedSQLEditor:
             self.status_label.configure(text=f"AI Error: {str(e)}")
     
     def explain_sql(self):
-        """Explain highlighted SQL or all SQL."""
+        """Explain highlighted SQL or all SQL using dedicated explainer with tooltip."""
         query, is_highlighted = self.get_query_for_ai()
         if not query:
             self.status_label.configure(text="No query to explain")
             return
         
-        status_msg = "Explaining highlighted query..." if is_highlighted else "Explaining query..."
-        self.status_label.configure(text=status_msg)
+        # Initialize explanation tooltip if not already created
+        if self.explanation_tooltip is None:
+            self.explanation_tooltip = QueryExplanationTooltip(self.parent, self.db_manager)
         
-        if self.ai_integration:
-            explanation = self.ai_integration.explain_sql(query)
-            # Show explanation in a popup or status
-            self.status_label.configure(text=f"Explanation: {explanation[:50]}...")
+        # Get button position for tooltip placement
+        explain_btn = None
+        for widget in self.parent.winfo_children():
+            # Find the explain button (this is a simplified approach)
+            if hasattr(widget, 'winfo_children'):
+                for child in widget.winfo_children():
+                    if isinstance(child, tk.Button) and 'Explain' in str(child.cget('text') if hasattr(child, 'cget') else ''):
+                        explain_btn = child
+                        break
+        
+        if explain_btn:
+            x = explain_btn.winfo_rootx() + explain_btn.winfo_width() // 2
+            y = explain_btn.winfo_rooty() + explain_btn.winfo_height() + 10
         else:
-            self.status_label.configure(text="AI integration not available")
+            # Fallback to editor position
+            x = self.editor.winfo_rootx() + self.editor.winfo_width() // 2
+            y = self.editor.winfo_rooty() + 50
+        
+        # Show explanation in tooltip
+        self.status_label.configure(text="Generating explanation...")
+        self.explanation_tooltip.show_explanation(query, x, y)
+        
+        # Update status after a delay
+        self.parent.after(2000, lambda: self.status_label.configure(text="Explanation displayed in tooltip"))
     
     def toggle_syntax(self):
         """Toggle syntax highlighting."""
@@ -1195,12 +1226,48 @@ class EnhancedSQLEditor:
             )
     
     def generate_dashboard(self):
-        """Generate dashboard from current query results."""
+        """Generate dashboard from selected query or current query results."""
+        # Check if there's a selected query in the editor first
+        selected_query, is_selected = self.get_query_for_ai()
+        
+        # If there's a selected query, execute it first to get results
+        if is_selected and selected_query.strip():
+            # Execute the selected query to get results for dashboard
+            self.status_label.configure(text="Executing selected query for dashboard...")
+            try:
+                # Compile the SQL query
+                compiled_query = self.sql_compiler.compile_sql(selected_query)
+                
+                # Execute the query
+                if self.db_manager and self.db_manager.current_db:
+                    result = self.db_manager.execute_query(compiled_query)
+                    
+                    if isinstance(result, tuple) and len(result) == 3:
+                        columns, data, error = result
+                        if error:
+                            from tkinter import messagebox
+                            messagebox.showerror("Query Error", 
+                                               f"Failed to execute selected query:\n{error}")
+                            return
+                        elif columns and data is not None:
+                            # Use selected query results for dashboard
+                            self.current_query = selected_query
+                            self.current_query_columns = columns
+                            self.current_query_data = data
+                            # Update dashboard with selected query results
+                            if hasattr(self, 'dashboard_panel') and self.dashboard_panel:
+                                self.dashboard_panel.set_query_results(selected_query, columns, data)
+            except Exception as e:
+                from tkinter import messagebox
+                messagebox.showerror("Error", f"Failed to execute selected query: {str(e)}")
+                return
+        
+        # Check if we have query results (either from selection or previously executed)
         if not self.current_query_data or not self.current_query_columns:
             from tkinter import messagebox
             messagebox.showwarning("No Data", 
                                  "No query results available.\n\n"
-                                 "Please run a SQL query first and then generate the dashboard.")
+                                 "Please select a query in the editor or run a SQL query first.")
             return
         
         # Switch to dashboard tab if available
