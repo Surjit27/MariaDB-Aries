@@ -1,131 +1,5 @@
 [
   {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n-- 4️⃣ Pokémon Table\nCREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);",
-    "timestamp": "2025-11-01T18:26:02.171919",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 8
-  },
-  {
-    "query": "CREATE TABLE pokemon_type (\npokemon_id INTEGER,\ntype_id INTEGER,\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id)\n)",
-    "timestamp": "2025-11-01T18:26:14.458966",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 9
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:26:14.513289",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 10
-  },
-  {
-    "query": "CREATE TABLE pokemon_ability (\npokemon_id INTEGER,\nability_id INTEGER,\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id)\n)",
-    "timestamp": "2025-11-01T18:26:21.291632",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 11
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:26:21.337170",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 12
-  },
-  {
-    "query": "CREATE TABLE trainer (\ntrainer_name TEXT NOT NULL,\ngender ENUM('MALE', 'Female', 'Other'),\nhometown TEXT,\nregion_id INTEGER,\ntrainer_id INT AUTO_INCREMENT PRIMARY KEY,\nFOREIGN KEY (region_id) REFERENCES region(region_id)\n)",
-    "timestamp": "2025-11-01T18:26:27.797299",
-    "status": "error: near \"'MALE'\": syntax error",
-    "database": "pokemon_world",
-    "id": 13
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);",
-    "timestamp": "2025-11-01T18:26:27.797299",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 14
-  },
-  {
-    "query": "CREATE TABLE pokemon_trainer (\ntrainer_id INTEGER,\npokemon_id INTEGER,\nnickname TEXT,\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id)\n)",
-    "timestamp": "2025-11-01T18:26:34.688679",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 15
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:26:34.735366",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 16
-  },
-  {
-    "query": "CREATE TABLE battle (\nlocation TEXT,\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\nbattle_id INT AUTO_INCREMENT PRIMARY KEY,\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:26:40.597829",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 17
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);",
-    "timestamp": "2025-11-01T18:26:40.634069",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 18
-  },
-  {
-    "query": "CREATE TABLE battle_pokemon (\nbattle_id INTEGER,\npokemon_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:26:46.801005",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 19
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:26:46.849915",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 20
-  },
-  {
-    "query": "INSERT INTO region (region_name) VALUES ('Kanto'), ('Johto'), ('Hoenn'); INSERT INTO type (type_name) VALUES ('Fire'), ('Water'), ('Grass'), ('Electric'), ('Flying'); INSERT INTO ability (ability_name, description) VALUES ('Overgrow', 'Boosts Grass moves'), ('Blaze', 'Boosts Fire moves'), ('Torrent', 'Boosts Water moves'); INSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate) VALUES ('Bulbasaur', 1, 64, 0.7, 6.9, 45), ('Charmander', 1, 62, 0.6, 8.5, 45), ('Squirtle', 1, 63, 0.5, 9.0, 45); INSERT INTO pokemon_type VALUES (1, 3), (2, 1), (3, 2); INSERT INTO pokemon_ability VALUES (1, 1), (2, 2), (3, 3); INSERT INTO trainer (trainer_name, gender, hometown, region_id) VALUES ('Ash', 'Male', 'Pallet Town', 1), ('Misty', 'Female', 'Cerulean City', 1); INSERT INTO pokemon_trainer (trainer_id, pokemon_id, nickname, level, caught_date) VALUES (1, 2, 'Blaze', 12, '2024-07-10'), (2, 3, 'Splashy', 10, '2024-07-12')",
-    "timestamp": "2025-11-01T18:27:08.105221",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 21
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nINSERT INTO region (region_name) VALUES ('Kanto'), ('Johto'), ('Hoenn');\n\nINSERT INTO type (type_name) VALUES ('Fire'), ('Water'), ('Grass'), ('Electric'), ('Flying');\n\nINSERT INTO ability (ability_name, description) VALUES\n('Overgrow', 'Boosts Grass moves'),\n('Blaze', 'Boosts Fire moves'),\n('Torrent', 'Boosts Water moves');\n\nINSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate)\nVALUES\n('Bulbasaur', 1, 64, 0.7, 6.9, 45),\n('Charmander', 1, 62, 0.6, 8.5, 45),\n('Squirtle', 1, 63, 0.5, 9.0, 45);\n\nINSERT INTO pokemon_type VALUES\n(1, 3),  -- Bulbasaur -> Grass\n(2, 1),  -- Charmander -> Fire\n(3, 2);  -- Squirtle -> Water\n\nINSERT INTO pokemon_ability VALUES\n(1, 1),\n(2, 2),\n(3, 3);\n\nINSERT INTO trainer (trainer_name, gender, hometown, region_id)\nVALUES ('Ash', 'Male', 'Pallet Town', 1),\n       ('Misty', 'Female', 'Cerulean City', 1);\n\nINSERT INTO pokemon_trainer (trainer_id, pokemon_id, nickname, level, caught_date)\nVALUES (1, 2, 'Blaze', 12, '2024-07-10'),\n       (2, 3, 'Splashy', 10, '2024-07-12');",
-    "timestamp": "2025-11-01T18:27:08.112925",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 22
-  },
-  {
-    "query": "INSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate) VALUES ('Bulbasaur', 1, 64, 0.7, 6.9, 45), ('Charmander', 1, 62, 0.6, 8.5, 45), ('Squirtle', 1, 63, 0.5, 9.0, 45); INSERT INTO pokemon_type VALUES (1, 3), (2, 1), (3, 2); INSERT INTO pokemon_ability VALUES (1, 1), (2, 2), (3, 3); INSERT INTO trainer (trainer_name, gender, hometown, region_id) VALUES ('Ash', 'Male', 'Pallet Town', 1), ('Misty', 'Female', 'Cerulean City', 1); INSERT INTO pokemon_trainer (trainer_id, pokemon_id, nickname, level, caught_date) VALUES (1, 2, 'Blaze', 12, '2024-07-10'), (2, 3, 'Splashy', 10, '2024-07-12')",
-    "timestamp": "2025-11-01T18:27:17.605360",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 23
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\nINSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate)\nVALUES\n('Bulbasaur', 1, 64, 0.7, 6.9, 45),\n('Charmander', 1, 62, 0.6, 8.5, 45),\n('Squirtle', 1, 63, 0.5, 9.0, 45);\n\nINSERT INTO pokemon_type VALUES\n(1, 3),  -- Bulbasaur -> Grass\n(2, 1),  -- Charmander -> Fire\n(3, 2);  -- Squirtle -> Water\n\nINSERT INTO pokemon_ability VALUES\n(1, 1),\n(2, 2),\n(3, 3);\n\nINSERT INTO trainer (trainer_name, gender, hometown, region_id)\nVALUES ('Ash', 'Male', 'Pallet Town', 1),\n       ('Misty', 'Female', 'Cerulean City', 1);\n\nINSERT INTO pokemon_trainer (trainer_id, pokemon_id, nickname, level, caught_date)\nVALUES (1, 2, 'Blaze', 12, '2024-07-10'),\n       (2, 3, 'Splashy', 10, '2024-07-12');",
-    "timestamp": "2025-11-01T18:27:17.612648",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 24
-  },
-  {
-    "query": "INSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate) VALUES ('Bulbasaur', 1, 64, 0.7, 6.9, 45), ('Charmander', 1, 62, 0.6, 8.5, 45), ('Squirtle', 1, 63, 0.5, 9.0, 45)",
-    "timestamp": "2025-11-01T18:27:21.243456",
-    "status": "error: FOREIGN KEY constraint failed",
-    "database": "pokemon_world",
-    "id": 25
-  },
-  {
     "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\nINSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate)\nVALUES\n('Bulbasaur', 1, 64, 0.7, 6.9, 45),\n('Charmander', 1, 62, 0.6, 8.5, 45),\n('Squirtle', 1, 63, 0.5, 9.0, 45);",
     "timestamp": "2025-11-01T18:27:21.251691",
     "status": "success",
@@ -697,6 +571,132 @@
     "timestamp": "2025-11-01T19:19:49.983508",
     "status": "success",
     "database": "sspokemon_world",
+    "id": 101
+  },
+  {
+    "query": "select * from type",
+    "timestamp": "2025-11-01T19:38:15.491338",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nselect * from type",
+    "timestamp": "2025-11-01T19:38:15.500565",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "SELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id; select * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:41:47.717321",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id;\n\n\nselect * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:41:47.733145",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "SELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id",
+    "timestamp": "2025-11-01T19:41:57.149850",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id;",
+    "timestamp": "2025-11-01T19:41:57.149850",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "SELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id; select * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:42:03.622347",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id;\n\n\nselect * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:42:03.645615",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "select * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:42:08.419488",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n\nselect * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:42:08.443801",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "select * from battle; select * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:43:52.304409",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\nselect * from battle;\n\n\nselect * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:43:52.320250",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "select * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:45:24.765946",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n\n\nselect * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:45:24.769100",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "SELECT * FROM pokemon_trainer WHERE trainer_id = 47; select * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:46:54.497671",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT * FROM pokemon_trainer WHERE trainer_id = 47;\n\nselect * from pokemon_trainer",
+    "timestamp": "2025-11-01T19:46:54.513846",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "SELECT * FROM pokemon_trainer WHERE trainer_id = 47",
+    "timestamp": "2025-11-01T19:46:57.678399",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 101
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT * FROM pokemon_trainer WHERE trainer_id = 47;",
+    "timestamp": "2025-11-01T19:46:57.678399",
+    "status": "success",
+    "database": "pokemon_world",
     "id": 101
   }
 ]

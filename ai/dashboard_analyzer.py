@@ -240,14 +240,23 @@ IMPORTANT:
 - Each chart should reveal different insights
 - Consider different perspectives: time trends, distributions, correlations, comparisons, etc.
 
-CHART TYPES AVAILABLE:
-- line: For time series or sequential data
-- bar: For categorical comparisons
-- scatter: For relationships between two numeric variables
-- pie: For proportions/percentages (use sparingly, max 8 categories)
-- heatmap: For correlation or cross-tabulation
-- histogram: For distribution of a single numeric variable
-- boxplot: For statistical distribution
+CHART TYPES AVAILABLE (all supported):
+- line: For time series or sequential data, trends over time, continuous progressions
+- bar: For categorical comparisons, ranking data, comparing groups
+- scatter: For relationships between two numeric variables, correlation analysis
+- pie: For proportions/percentages, part-to-whole relationships (use for 2-8 categories max)
+- heatmap: For correlation matrices, cross-tabulation, two-dimensional patterns
+- histogram: For distribution of a single numeric variable, frequency analysis
+- boxplot: For statistical distribution, quartiles, outliers, comparing groups
+
+IMPORTANT FOR CHART SELECTION:
+- Use pie charts when showing proportions/percentages (e.g., type distribution, region breakdown)
+- Use line charts for time-based data, trends, or sequential progressions
+- Use bar charts for categorical comparisons (e.g., Pokemon by region, abilities count)
+- Use scatter plots to find correlations (e.g., weight vs height, experience vs level)
+- Use heatmaps for relationships between categorical variables
+- Use histograms to show distribution of a single metric
+- Use boxplots to compare distributions across categories
 
 OUTPUT FORMAT (JSON only, no markdown):
 {{

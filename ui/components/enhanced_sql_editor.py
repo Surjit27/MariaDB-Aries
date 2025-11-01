@@ -81,8 +81,32 @@ class EnhancedSQLEditor:
         # Separator
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
         
-        # Dashboard button
-        self.create_toolbar_button(toolbar_frame, "📊", "Dashboard", self.generate_dashboard, "Generate Dashboard with AI")
+        # Dashboard button with purple highlight
+        dashboard_btn = tk.Button(toolbar_frame, 
+                                  text="📊", 
+                                  command=self.generate_dashboard,
+                                  bg="#8B5CF6",  # Purple background
+                                  fg="white",    # White text
+                                  font=("Segoe UI Emoji", 12),
+                                  width=3, height=1,
+                                  activebackground="#7C3AED",  # Darker purple on hover
+                                  activeforeground="white",
+                                  relief="flat",
+                                  cursor="hand2",
+                                  padx=4, pady=2,
+                                  highlightthickness=0,
+                                  borderwidth=1,
+                                  highlightbackground="#8B5CF6",
+                                  highlightcolor="#7C3AED")
+        # Subtle hover effect
+        def on_enter_dashboard(e):
+            dashboard_btn.configure(bg="#7C3AED", highlightbackground="#7C3AED")
+        def on_leave_dashboard(e):
+            dashboard_btn.configure(bg="#8B5CF6", highlightbackground="#8B5CF6")
+        dashboard_btn.bind("<Enter>", on_enter_dashboard)
+        dashboard_btn.bind("<Leave>", on_leave_dashboard)
+        dashboard_btn.pack(side=tk.LEFT, padx=3)
+        self.create_tooltip(dashboard_btn, "Generate Dashboard with AI")
         
         # Separator
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)

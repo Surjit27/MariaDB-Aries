@@ -56,9 +56,20 @@ class AIDashboardPanel(ttk.Frame):
         toolbar_frame = ttk.Frame(self)
         toolbar_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        self.generate_btn = ttk.Button(toolbar_frame, text="🤖 Generate Dashboard with AI", 
+        # Create button with purple highlight
+        self.generate_btn = tk.Button(toolbar_frame, 
+                                      text="🤖 Generate Dashboard with AI", 
                                       command=self.generate_dashboard,
-                                      bootstyle="primary")
+                                      bg="#8B5CF6",  # Purple background
+                                      fg="white",    # White text
+                                      font=("Arial", 10, "bold"),
+                                      relief=tk.RAISED,
+                                      bd=2,
+                                      padx=15,
+                                      pady=8,
+                                      cursor="hand2",
+                                      activebackground="#7C3AED",  # Darker purple on hover
+                                      activeforeground="white")
         self.generate_btn.pack(side=tk.LEFT, padx=5)
         
         self.customize_btn = ttk.Button(toolbar_frame, text="⚙️ Customize Visualization", 
