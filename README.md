@@ -19,7 +19,7 @@ Just like the Aries constellation lights up the database sky, this edition bring
 ## 🎯 Key Features at a Glance
 
 ### 🔧 Intelligent SQL Compiler
-Transform SQL from any major database system (MySQL, PostgreSQL, SQL Server, Oracle) into SQLite-compatible syntax automatically.
+Transform SQL from any major database system into SQLite-compatible syntax automatically.
 
 ### 🤖 AI-Powered Query Generation
 Generate perfect SQL queries from natural language - supports multiple languages including English, Tamil, Hindi, French, and more!
