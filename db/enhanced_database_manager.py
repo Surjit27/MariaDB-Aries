@@ -136,7 +136,16 @@ class EnhancedDatabaseManager:
                 results = self.cursor.fetchall()
                 return column_names, results, None
             else:
-                self.connection.commit()
+                # Commit only for DML statements (INSERT, UPDATE, DELETE)
+                # DDL statements (CREATE, DROP, ALTER) are auto-committed by SQLite
+                is_ddl = any(query_upper.startswith(cmd) for cmd in ["CREATE", "DROP", "ALTER"])
+                if not is_ddl:
+                    try:
+                        self.connection.commit()
+                    except sqlite3.OperationalError as commit_error:
+                        # If commit fails (e.g., no transaction active), it's OK for some statements
+                        if "no transaction is active" not in str(commit_error).lower():
+                            raise  # Re-raise if it's a different error
                 # Reload schema after CREATE/ALTER/DROP statements to update UI
                 if any(query_upper.startswith(cmd) for cmd in ["CREATE", "ALTER", "DROP"]):
                     try:
@@ -256,8 +265,17 @@ class EnhancedDatabaseManager:
                     if self.cursor.description:
                         results.extend(self.cursor.fetchall())
                 
-                # Commit after each statement to ensure changes are saved
-                self.connection.commit()
+                # Commit only for DML statements (INSERT, UPDATE, DELETE)
+                # DDL statements (CREATE, DROP, ALTER) are auto-committed by SQLite
+                # Calling commit() on DDL statements can cause "cannot commit - no transaction is active"
+                is_ddl = any(statement_upper.startswith(cmd) for cmd in ["CREATE", "DROP", "ALTER"])
+                if not is_ddl:
+                    try:
+                        self.connection.commit()
+                    except sqlite3.OperationalError as commit_error:
+                        # If commit fails (e.g., no transaction active), it's OK for some statements
+                        if "no transaction is active" not in str(commit_error).lower():
+                            raise  # Re-raise if it's a different error
                         
             except sqlite3.Error as e:
                 error_msg = f"Statement {i+1}: {str(e)}"
@@ -413,7 +431,9 @@ class EnhancedDatabaseManager:
             schema = {
                 "database_name": self.current_db or "Unknown",
                 "tables": [],
-                "relationships": []
+                "relationships": [],
+                "views": [],
+                "triggers": []
             }
             
             # Get schema for each table
@@ -450,6 +470,31 @@ class EnhancedDatabaseManager:
                     schema["relationships"].append(relationship)
                 
                 schema["tables"].append(table_info)
+            
+            # Get all views with their definitions
+            try:
+                self.cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='view'")
+                views_data = self.cursor.fetchall()
+                for view_name, view_sql in views_data:
+                    schema["views"].append({
+                        "name": view_name,
+                        "definition": view_sql or ""  # The CREATE VIEW statement
+                    })
+            except Exception as e:
+                print(f"Error getting views: {e}")
+            
+            # Get all triggers with their definitions
+            try:
+                self.cursor.execute("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'")
+                triggers_data = self.cursor.fetchall()
+                for trigger_name, table_name, trigger_sql in triggers_data:
+                    schema["triggers"].append({
+                        "name": trigger_name,
+                        "table": table_name,  # Which table the trigger is on
+                        "definition": trigger_sql or ""  # The CREATE TRIGGER statement
+                    })
+            except Exception as e:
+                print(f"Error getting triggers: {e}")
             
             return schema
             
@@ -755,7 +800,7 @@ class EnhancedDatabaseManager:
             self.current_db = None
 
     def _split_sql_statements(self, query: str) -> List[str]:
-        """Split SQL statements by semicolon, handling strings and comments."""
+        """Split SQL statements by semicolon, handling strings, comments, and BEGIN/END blocks."""
         import re
         
         # First, remove comments (but preserve structure for splitting)
@@ -776,6 +821,7 @@ class EnhancedDatabaseManager:
         current = ""
         in_string = False
         string_char = None
+        begin_end_depth = 0  # Track depth of BEGIN/END blocks
         
         i = 0
         while i < len(query):
@@ -787,12 +833,35 @@ class EnhancedDatabaseManager:
                     in_string = True
                     string_char = char
                     current += char
-                # Check for semicolon (statement separator)
+                # Check for BEGIN keyword (case-insensitive, word boundary)
+                elif i + 4 < len(query) and query[i:i+5].upper() == 'BEGIN':
+                    # Check word boundaries - must be preceded/followed by non-word character or start/end
+                    prev_char = query[i-1] if i > 0 else ' '
+                    next_char = query[i+5] if i + 5 < len(query) else ' '
+                    if not (prev_char.isalnum() or prev_char == '_') and \
+                       not (next_char.isalnum() or next_char == '_'):
+                        begin_end_depth += 1
+                    current += char
+                # Check for END keyword (case-insensitive, word boundary)
+                elif i + 2 < len(query) and query[i:i+3].upper() == 'END':
+                    # Check word boundaries - must be preceded/followed by non-word character or start/end
+                    prev_char = query[i-1] if i > 0 else ' '
+                    next_char = query[i+3] if i + 3 < len(query) else ' '
+                    if not (prev_char.isalnum() or prev_char == '_') and \
+                       not (next_char.isalnum() or next_char == '_'):
+                        begin_end_depth -= 1
+                    current += char
+                    # If we've closed all BEGIN/END blocks, the next semicolon ends the statement
+                # Check for semicolon (statement separator) - only if not inside BEGIN/END block
                 elif char == ';':
-                    stmt = current.strip()
-                    if stmt:
-                        statements.append(stmt)
-                    current = ""
+                    if begin_end_depth == 0:
+                        stmt = current.strip()
+                        if stmt:
+                            statements.append(stmt)
+                        current = ""
+                    else:
+                        # Semicolon inside BEGIN/END block - keep it
+                        current += char
                 else:
                     current += char
             else:

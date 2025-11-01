@@ -694,6 +694,20 @@ class HorizontalAIModal:
             # Add confirmation message with "Optimize Again" button
             self.add_confirmation_with_optimize_again(inserted_start, inserted_end, suggestion_data['new_code'])
             
+            # Add accepted SQL to conversation history so AI has context for follow-up requests
+            accepted_sql = suggestion_data.get('new_code', '').strip()
+            if accepted_sql:
+                # Add to session context as assistant response (the SQL that was accepted)
+                try:
+                    self.session_context.append({
+                        'role': 'assistant', 
+                        'content': f"Accepted SQL query:\n{accepted_sql}"
+                    })
+                    if len(self.session_context) > self._max_context_items:
+                        self.session_context = self.session_context[-self._max_context_items:]
+                except Exception:
+                    pass
+            
             # Disable Keep/Reject buttons
             self.disable_suggestion_buttons(suggestion_data)
             
@@ -706,9 +720,11 @@ class HorizontalAIModal:
         try:
             # Remove buttons and replace with text
             try:
-                # Destroy button widgets
-                keep_btn_ref.destroy()
-                discard_btn_ref.destroy()
+                # Destroy button widgets (only if they exist)
+                if keep_btn_ref and keep_btn_ref.winfo_exists():
+                    keep_btn_ref.destroy()
+                if discard_btn_ref and discard_btn_ref.winfo_exists():
+                    discard_btn_ref.destroy()
                 
                 # Delete the button area and insert status text
                 button_end_pos = self.chat_text.index(f"{button_start_pos}+1c")  # Approximate end
@@ -742,11 +758,13 @@ class HorizontalAIModal:
             self.handle_keep_suggestion(suggestion_data)
         except Exception as e:
             print(f"Error in keep action: {e}")
-            # Fallback: just disable buttons if removal fails
+            # Fallback: just disable buttons if removal fails (only if they still exist)
             try:
-                keep_btn_ref.config(text="Query accepted", state=tk.DISABLED, fg="#28a745", font=("Arial", 9))
-                discard_btn_ref.config(state=tk.DISABLED)
-            except Exception:
+                if keep_btn_ref and keep_btn_ref.winfo_exists():
+                    keep_btn_ref.config(text="Query accepted", state=tk.DISABLED, fg="#28a745", font=("Arial", 9))
+                if discard_btn_ref and discard_btn_ref.winfo_exists():
+                    discard_btn_ref.config(state=tk.DISABLED)
+            except (tk.TclError, AttributeError):
                 pass
 
     def _compact_reject_action(self, suggestion_data, keep_btn_ref, discard_btn_ref, button_start_pos):
@@ -754,9 +772,11 @@ class HorizontalAIModal:
         try:
             # Remove buttons and replace with text
             try:
-                # Destroy button widgets
-                keep_btn_ref.destroy()
-                discard_btn_ref.destroy()
+                # Destroy button widgets (only if they exist)
+                if keep_btn_ref and keep_btn_ref.winfo_exists():
+                    keep_btn_ref.destroy()
+                if discard_btn_ref and discard_btn_ref.winfo_exists():
+                    discard_btn_ref.destroy()
                 
                 # Delete the button area and insert status text
                 button_end_pos = self.chat_text.index(f"{button_start_pos}+1c")  # Approximate end
@@ -790,11 +810,13 @@ class HorizontalAIModal:
             self.handle_discard_suggestion(suggestion_data)
         except Exception as e:
             print(f"Error in reject action: {e}")
-            # Fallback: just disable buttons if removal fails
+            # Fallback: just disable buttons if removal fails (only if they still exist)
             try:
-                discard_btn_ref.config(text="Query rejected", state=tk.DISABLED, fg="#dc3545", font=("Arial", 9))
-                keep_btn_ref.config(state=tk.DISABLED)
-            except Exception:
+                if discard_btn_ref and discard_btn_ref.winfo_exists():
+                    discard_btn_ref.config(text="Query rejected", state=tk.DISABLED, fg="#dc3545", font=("Arial", 9))
+                if keep_btn_ref and keep_btn_ref.winfo_exists():
+                    keep_btn_ref.config(state=tk.DISABLED)
+            except (tk.TclError, AttributeError):
                 pass
 
     # Removed inline Insert/Undo bar per new compact UX
@@ -815,7 +837,7 @@ class HorizontalAIModal:
         """Disable the Keep/Discard buttons after action."""
         try:
             # Match by comparing key fields that uniquely identify the suggestion
-            for btn_id, btn_info in self.inline_buttons.items():
+            for btn_id, btn_info in list(self.inline_buttons.items()):  # Use list() to avoid modification during iteration
                 stored_data = btn_info.get('data', {})
                 # Compare by key fields (new_code is the most reliable identifier)
                 if stored_data.get('new_code') == suggestion_data.get('new_code'):
@@ -828,13 +850,27 @@ class HorizontalAIModal:
                     if (old_code_match and old_start_match and old_end_match) or \
                        (not suggestion_data.get('old_code') and not stored_data.get('old_code')):
                         try:
-                            btn_info['keep'].config(state=tk.DISABLED)
-                            btn_info['discard'].config(state=tk.DISABLED)
+                            # Check if widgets exist before accessing them
+                            keep_btn = btn_info.get('keep')
+                            discard_btn = btn_info.get('discard')
+                            
+                            if keep_btn and keep_btn.winfo_exists():
+                                keep_btn.config(state=tk.DISABLED)
+                            if discard_btn and discard_btn.winfo_exists():
+                                discard_btn.config(state=tk.DISABLED)
+                        except (tk.TclError, AttributeError) as e:
+                            # Widget was destroyed, remove from dictionary to clean up
+                            try:
+                                del self.inline_buttons[btn_id]
+                            except:
+                                pass
                         except Exception as e:
-                            print(f"Error disabling button: {e}")
+                            # Other errors - log but don't fail
+                            pass
                         break
         except Exception as e:
-            print(f"Error disabling buttons: {e}")
+            # Silently handle errors - widgets may have been destroyed
+            pass
     
     def add_confirmation_message(self, message):
         """Add a confirmation message to chat."""
@@ -1673,9 +1709,14 @@ Please complete the query using the database schema and ensure it's syntacticall
                     finally:
                         self.ai_response_pending = False
                     
-                    if ai_sql is None:  # Error occurred
+                    if ai_sql is None:  # Error occurred or invalid SQL detected
+                        error_msg = "⚠️ The AI generated SQL with invalid syntax (e.g., DISTINCT aggregates with multiple arguments)."
+                        error_msg += "\n\nPlease try asking the AI to fix the query, or rephrase your request."
+                        self.add_chat_message("assistant", error_msg)
                         self.input_entry.configure(state="normal")
                         self.input_var.set("")
+                        if hasattr(self, 'chat_text'):
+                            self.chat_text.see('end')
                         return
                     
                     if not ai_sql or not str(ai_sql).strip():
@@ -1687,6 +1728,15 @@ Please complete the query using the database schema and ensure it's syntacticall
                     parsed = self._parse_ai_response(ai_sql)
                     ai_sql_clean = parsed['sql']
                     explanation = parsed.get('explanation')
+                    
+                    # Check if parsed SQL is the fallback "SELECT 1"
+                    if ai_sql_clean and ai_sql_clean.strip().upper() == "SELECT 1":
+                        self.add_chat_message("assistant", "⚠️ Could not parse valid SQL from AI response. The AI may have generated an explanation without SQL. Please try rephrasing your request with more specific instructions.")
+                        self.input_entry.configure(state="normal")
+                        self.input_var.set("")
+                        if hasattr(self, 'chat_text'):
+                            self.chat_text.see('end')
+                        return
                     
                     if not self._looks_like_sql(ai_sql_clean):
                         self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
@@ -1739,9 +1789,14 @@ Please provide an improved version of this query. Consider:
                 finally:
                     self.ai_response_pending = False
                 
-                if ai_sql is None:  # Error occurred, skip rest
+                if ai_sql is None:  # Error occurred or invalid SQL detected
+                    error_msg = "⚠️ The AI generated SQL with invalid syntax (e.g., DISTINCT aggregates with multiple arguments)."
+                    error_msg += "\n\nPlease try asking the AI to fix the query, or rephrase your request."
+                    self.add_chat_message("assistant", error_msg)
                     self.input_entry.configure(state="normal")
                     self.input_var.set("")
+                    if hasattr(self, 'chat_text'):
+                        self.chat_text.see('end')
                     return
                 
                 # Handle empty/missing response
@@ -1861,12 +1916,34 @@ This could be a simple SELECT query that shows data from one or more tables."""
             # If non-SQL prompt, convert natural language to SQL (use full file as context too)
             if not self._looks_like_sql(prompt_text):
                 norm_instruction = self._normalize_mentions(prompt_text)
-                instruction = f"""The user has provided a natural language request to generate or modify SQL.
+                
+                # Check if user is referencing "this", "that", "it", etc. - likely referring to current query
+                current_query = ""
+                if hasattr(self.sql_editor, 'get_query_for_ai'):
+                    query_text, _ = self.sql_editor.get_query_for_ai()
+                    if query_text and query_text.strip():
+                        current_query = query_text.strip()
+                
+                # Build instruction with context about current query if user might be referencing it
+                reference_words = ['this', 'that', 'it', 'the query', 'the sql', 'make', 'convert', 'create']
+                is_reference = any(ref_word in norm_instruction.lower() for ref_word in reference_words)
+                
+                if is_reference and current_query:
+                    instruction = f"""The user has provided a natural language request: {norm_instruction}
+
+IMPORTANT: The user is likely referring to the CURRENT QUERY in the SQL editor. Please use this query as the basis for your response:
+
+CURRENT QUERY IN EDITOR:
+{current_query}
+
+Generate a complete, executable SQL query or modification that fulfills the user's request based on the current query above."""
+                else:
+                    instruction = f"""The user has provided a natural language request to generate or modify SQL.
 Please convert this request into a valid SQL query.
 
 User Request (with normalized mentions): {norm_instruction}
 
-Generate a complete, executable SQL query that fulfills the user's request."""
+{('CURRENT QUERY IN EDITOR (for reference):\n' + current_query + '\n\n' if current_query else '')}Generate a complete, executable SQL query that fulfills the user's request."""
                 
                 ai_prompt = self._build_enhanced_prompt(
                     user_request=instruction,
@@ -2512,7 +2589,9 @@ Otherwise, interpret the request and generate appropriate SQL."""
             schema = {
                 "database_name": self.db_manager.current_db,
                 "tables": [],
-                "relationships": []
+                "relationships": [],
+                "views": [],
+                "triggers": []
             }
             
             for table_name in tables:
@@ -2556,6 +2635,31 @@ Otherwise, interpret the request and generate appropriate SQL."""
                 except Exception as e:
                     print(f"Error extracting schema for table {table_name}: {e}")
                     continue
+            
+            # Get views with their definitions
+            try:
+                self.db_manager.cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='view'")
+                views_data = self.db_manager.cursor.fetchall()
+                for view_name, view_sql in views_data:
+                    schema["views"].append({
+                        "name": view_name,
+                        "definition": view_sql or ""
+                    })
+            except Exception as e:
+                print(f"Error extracting views: {e}")
+            
+            # Get triggers with their definitions
+            try:
+                self.db_manager.cursor.execute("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'")
+                triggers_data = self.db_manager.cursor.fetchall()
+                for trigger_name, table_name, trigger_sql in triggers_data:
+                    schema["triggers"].append({
+                        "name": trigger_name,
+                        "table": table_name,
+                        "definition": trigger_sql or ""
+                    })
+            except Exception as e:
+                print(f"Error extracting triggers: {e}")
             
             return schema
         except Exception as e:
@@ -2616,6 +2720,35 @@ Database: {db_name}
                 to_col = rel.get('to_column', '')
                 formatted += f"   • {from_tbl}.{from_col} → {to_tbl}.{to_col}\n"
             formatted += "\n"
+        
+        # Format views
+        views = schema.get('views', [])
+        if views:
+            formatted += "👁️ VIEWS:\n"
+            for view in views:
+                view_name = view.get('name', 'unknown')
+                view_def = view.get('definition', '')
+                formatted += f"   📊 VIEW: {view_name}\n"
+                if view_def:
+                    # Truncate very long view definitions
+                    view_def_display = view_def[:500] + "..." if len(view_def) > 500 else view_def
+                    formatted += f"      Definition: {view_def_display}\n"
+                formatted += "\n"
+        
+        # Format triggers
+        triggers = schema.get('triggers', [])
+        if triggers:
+            formatted += "🔔 TRIGGERS:\n"
+            for trigger in triggers:
+                trigger_name = trigger.get('name', 'unknown')
+                trigger_table = trigger.get('table', 'unknown')
+                trigger_def = trigger.get('definition', '')
+                formatted += f"   🔔 TRIGGER: {trigger_name} (on table: {trigger_table})\n"
+                if trigger_def:
+                    # Truncate very long trigger definitions
+                    trigger_def_display = trigger_def[:500] + "..." if len(trigger_def) > 500 else trigger_def
+                    formatted += f"      Definition: {trigger_def_display}\n"
+                formatted += "\n"
         
         formatted += "═══════════════════════════════════════════════════════════════\n"
         return formatted
@@ -2705,13 +2838,29 @@ IMPORTANT GUIDELINES:
 3. Include appropriate JOINs when working with multiple tables
 4. Use WHERE clauses effectively for filtering
 5. Consider performance implications
-6. Return your response in the following format:
-   EXPLANATION: [Brief English explanation of why this query is appropriate - what it does and why we're using it]
-   SQL_QUERY: [The actual SQL query]
-7. Ensure queries end with a semicolon (;)
-8. If the user has highlighted specific query text, focus on that query
-9. Use the provided database schema to ensure accurate table and column names
-10. Consider conversation history for context in follow-up requests
+6. Support all SQLite features including:
+   - CREATE TRIGGER statements (BEFORE/AFTER INSERT/UPDATE/DELETE)
+   - CREATE VIEW statements
+   - CREATE INDEX statements
+   - DDL operations (CREATE, DROP, ALTER)
+7. If the user mentions an existing trigger, view, function, or procedure name, use the exact definition provided in the schema
+8. When creating triggers, ensure they reference the correct table and column names from the schema
+9. When creating views, ensure they use valid SELECT statements referencing existing tables/columns
+10. CRITICAL: DISTINCT aggregates (COUNT(DISTINCT ...), SUM(DISTINCT ...), etc.) can only take EXACTLY ONE argument in SQLite.
+    WRONG: COUNT(DISTINCT col1, col2)
+    CORRECT: COUNT(DISTINCT col1) + COUNT(DISTINCT col2) OR use subqueries for multiple distinct counts
+11. Return your response in the following format:
+    EXPLANATION: [Brief English explanation of why this query is appropriate - what it does and why we're using it]
+    SQL_QUERY: [The actual SQL query]
+12. Ensure queries end with a semicolon (;)
+13. If the user has highlighted specific query text, focus on that query
+14. Use the provided database schema to ensure accurate table and column names
+15. Consider conversation history for context in follow-up requests
+16. If you encounter an error message, analyze it carefully and provide a corrected query that fixes the specific issue
+17. CRITICAL for follow-up requests: When the user says "this", "that", "it", "make this", "convert this", etc., they are referring to:
+    - The CURRENT QUERY shown in the editor/highlighted query section
+    - Or the LAST ACCEPTED QUERY from the conversation history
+    - Always reference the specific query mentioned and build upon it, don't generate generic queries
 
 ═══════════════════════════════════════════════════════════════
 

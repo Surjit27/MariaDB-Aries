@@ -123,6 +123,12 @@ class GeminiIntegration:
             print(f"🔍 Response Lines: {response_text.count(chr(10)) + 1}")
             
             sql_response = self._parse_gemini_response(response_text)
+            
+            # Check if parsing failed (returns None) or invalid SQL detected
+            if sql_response is None:
+                print("🔍 SQL parsing failed or invalid SQL detected (e.g., DISTINCT aggregates)")
+                return None
+            
             print(f"🔍 Parsed SQL Query: {repr(sql_response.query)}")
             print(f"🔍 Parsed Query Length: {len(sql_response.query)}")
             
@@ -252,34 +258,130 @@ SQL QUERY:
             print(f"🔍 Response has {len(lines)} lines")
             
             sql_query = ""
-            in_sql = False
-            for i, line in enumerate(lines):
-                line = line.strip()
-                print(f"🔍 Line {i}: {repr(line)}")
-                
-                # Check if this line starts a SQL statement
-                if line.upper().startswith(('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER')):
-                    in_sql = True
-                    sql_query = line
-                    print(f"🔍 Found SQL start: {line}")
-                elif in_sql and line:  # Continue collecting SQL lines
-                    sql_query += " " + line
-                    print(f"🔍 Adding to SQL: {line}")
-                elif in_sql and not line:  # Empty line, continue
-                    sql_query += "\n"
-                elif in_sql and not line.upper().startswith(('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER')):
-                    # End of SQL statement
-                    break
+            
+            # First, try to extract SQL from SQL_QUERY: marker
+            sql_query_marker = "SQL_QUERY:"
+            if sql_query_marker in response_text.upper():
+                # Find the actual marker with correct case
+                for marker_variant in ["SQL_QUERY:", "SQL_QUERY", "sql_query:", "sql_query"]:
+                    if marker_variant in response_text:
+                        marker_pos = response_text.find(marker_variant)
+                        sql_start = marker_pos + len(marker_variant)
+                        print(f"🔍 Found marker '{marker_variant}' at position {marker_pos}, SQL starts at {sql_start}")
+                        # Extract everything after the marker until EXPLANATION: or end
+                        remaining = response_text[sql_start:]
+                        print(f"🔍 Remaining text after marker: {repr(remaining[:100])}")
+                        exp_marker = remaining.upper().find("EXPLANATION:")
+                        if exp_marker != -1:
+                            sql_query = remaining[:exp_marker].strip()
+                            print(f"🔍 Found EXPLANATION at position {exp_marker}, extracted SQL: {repr(sql_query[:100])}")
+                        else:
+                            sql_query = remaining.strip()
+                            print(f"🔍 No EXPLANATION marker, extracted all remaining: {repr(sql_query[:100])}")
+                        # Clean up any leading/trailing punctuation (but keep the SQL)
+                        sql_query = sql_query.strip(':\n\r\t ')
+                        # Remove any leading/trailing quotes if present
+                        if sql_query.startswith('"') and sql_query.endswith('"'):
+                            sql_query = sql_query[1:-1]
+                        if sql_query.startswith("'") and sql_query.endswith("'"):
+                            sql_query = sql_query[1:-1]
+                        print(f"🔍 Final extracted from SQL_QUERY marker: {repr(sql_query[:100])}")
+                        if sql_query.strip():
+                            break  # Successfully extracted, break from marker loop
+            
+            # If not found via marker, look for SQL keywords directly
+            if not sql_query.strip():
+                in_sql = False
+                for i, line in enumerate(lines):
+                    line = line.strip()
+                    print(f"🔍 Line {i}: {repr(line)}")
+                    
+                    # Check if this line starts a SQL statement (after removing any prefix)
+                    line_for_check = line
+                    # Remove common prefixes
+                    for prefix in ["SQL_QUERY:", "SQL_QUERY", "sql_query:", "sql_query", "QUERY:", "query:"]:
+                        if line_for_check.upper().startswith(prefix):
+                            line_for_check = line_for_check[len(prefix):].strip()
+                            print(f"🔍 Removed prefix '{prefix}', checking: {repr(line_for_check[:50])}")
+                            break
+                    
+                    # Check for SQL keywords (including CREATE TRIGGER, CREATE FUNCTION, etc.)
+                    sql_keywords = ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 
+                                   'WITH', 'TRUNCATE', 'REPLACE', 'MERGE')
+                    if line_for_check.upper().startswith(sql_keywords):
+                        in_sql = True
+                        sql_query = line_for_check  # Use cleaned line
+                        print(f"🔍 Found SQL start: {repr(line_for_check[:100])}")
+                    elif in_sql and line:  # Continue collecting SQL lines
+                        sql_query += " " + line
+                        print(f"🔍 Adding to SQL: {repr(line[:50])}")
+                    elif in_sql and not line:  # Empty line, continue
+                        sql_query += "\n"
+                    elif in_sql and line.upper().startswith(('EXPLANATION', 'NOTE', 'NOTE:', 'COMMENT')):
+                        # End of SQL statement if we hit explanation
+                        break
+            
+            # Clean up SQL query (remove markdown code fences)
+            sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
             
             print(f"🔍 Final SQL query: {repr(sql_query.strip())}")
             
+            # Only use fallback if we truly got nothing from the AI
+            # If response_text exists but parsing failed, it's a parsing issue, not AI failure
             if not sql_query.strip():
-                sql_query = "SELECT 1"  # Fallback query
-                print("🔍 Using fallback query")
+                if response_text and len(response_text.strip()) > 10:
+                    # We got a response but couldn't parse it - return None to indicate parsing error
+                    print("🔍 Warning: Got AI response but couldn't parse SQL from it")
+                    print(f"🔍 Response was: {response_text[:200]}...")
+                    # Try one more time with a more lenient approach
+                    # Look for any line that starts with SELECT, INSERT, etc.
+                    lines = response_text.split('\n')
+                    for line in lines:
+                        line_upper = line.strip().upper()
+                        if line_upper.startswith(('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'WITH')):
+                            sql_query = line.strip()
+                            print(f"🔍 Found SQL via fallback search: {sql_query[:50]}...")
+                            break
+                    
+                    if not sql_query.strip():
+                        # Still nothing - return None so the caller can handle it properly
+                        return None
+                else:
+                    # No response from AI at all - use fallback
+                    sql_query = "SELECT 1"  # Fallback query
+                    print("🔍 Using fallback query (no AI response)")
+            
+            # Validate for common SQLite errors before returning
+            if sql_query and sql_query.strip():
+                sql_upper = sql_query.upper()
+                # Check for invalid DISTINCT aggregates (multiple arguments)
+                import re
+                distinct_aggregate_pattern = r'\b(COUNT|SUM|AVG|MAX|MIN)\s*\(\s*DISTINCT\s+[^,)]+,\s+[^)]+\)'
+                if re.search(distinct_aggregate_pattern, sql_query, re.IGNORECASE):
+                    print(f"🔍 Warning: Detected invalid DISTINCT aggregate in SQL")
+                    print(f"🔍 SQL: {sql_query[:200]}...")
+                    # Return None so caller can request a fix
+                    return None
+            
+            # Determine query type from the SQL
+            query_type = QueryType.SELECT
+            sql_upper = sql_query.strip().upper()
+            if sql_upper.startswith('INSERT'):
+                query_type = QueryType.INSERT
+            elif sql_upper.startswith('UPDATE'):
+                query_type = QueryType.UPDATE
+            elif sql_upper.startswith('DELETE'):
+                query_type = QueryType.DELETE
+            elif sql_upper.startswith('CREATE'):
+                query_type = QueryType.SELECT  # CREATE statements (triggers, functions, etc.)
+            elif sql_upper.startswith('DROP'):
+                query_type = QueryType.DELETE
+            elif sql_upper.startswith('ALTER'):
+                query_type = QueryType.UPDATE
             
             return SQLQueryResponse(
                 query=sql_query.strip(),
-                query_type=QueryType.SELECT,
+                query_type=query_type,
                 explanation="Generated SQL query from natural language prompt",
                 tables_involved=[],
                 columns_involved=[],

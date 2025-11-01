@@ -77,7 +77,7 @@ class EnhancedSQLEditor:
         # Toolbar buttons with improved icons
         self.create_toolbar_button(toolbar_frame, "▶", "Run Query", self.run_query, "Run SQL (Ctrl+R)")
         self.create_toolbar_button(toolbar_frame, "⚙", "Compile", self.compile_sql, "Compile SQL (Ctrl+Shift+C)")
-        self.create_toolbar_button(toolbar_frame, "🗑", "Clear", self.clear_editor, "Clear Editor (Ctrl+C)")
+        self.create_toolbar_button(toolbar_frame, "🗑", "Clear", self.clear_editor, "Clear Editor")
         self.create_toolbar_button(toolbar_frame, "✨", "AI Generate", self.generate_sql, "AI Generate (Ctrl+G)")
         self.create_toolbar_button(toolbar_frame, "💬", "AI Chat", self.show_horizontal_ai_modal, "AI Chat Assistant (Ctrl+Shift+A)")
         self.create_toolbar_button(toolbar_frame, "💡", "Explain", self.explain_sql, "Explain SQL")
@@ -340,12 +340,8 @@ class EnhancedSQLEditor:
         if event.state & 0x4 and event.keysym == "r":  # Ctrl+R
             self.run_query()
             return "break"
-        
-        # Handle Ctrl+C for clear
-        if event.state & 0x4 and event.keysym == "c":  # Ctrl+C
-            self.clear_editor()
-            return "break"
-        
+
+           
         # Handle Ctrl+G for AI generate
         if event.state & 0x4 and event.keysym == "g":  # Ctrl+G
             self.generate_sql()

@@ -1,702 +1,128 @@
 [
   {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\nINSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate)\nVALUES\n('Bulbasaur', 1, 64, 0.7, 6.9, 45),\n('Charmander', 1, 62, 0.6, 8.5, 45),\n('Squirtle', 1, 63, 0.5, 9.0, 45);",
-    "timestamp": "2025-11-01T18:27:21.251691",
+    "query": "SELECT\n T.trainer_name,\n T.hometown,\n R.region_name AS trainer_region,\n P.name AS pokemon_name,\n PTN.nickname,\n PTN.level,\n GROUP_CONCAT(DISTINCT TY.type_name, ', ') AS pokemon_types,\n GROUP_CONCAT(DISTINCT A.ability_name, ', ') AS pokemon_abilities,\n (SELECT COUNT(B.battle_id) FROM battle AS B WHERE B.winner_trainer_id = T.trainer_id) AS battles_won_count\nFROM\n trainer AS T\nJOIN\n region AS R ON T.region_id = R.region_id\nLEFT JOIN\n pokemon_trainer AS PTN ON T.trainer_id = PTN.trainer_id\nLEFT JOIN\n pokemon AS P ON PTN.pokemon_id = P.pokemon_id\nLEFT JOIN\n pokemon_type AS PTY ON P.pokemon_id = PTY.pokemon_id\nLEFT JOIN\n type AS TY ON PTY.type_id = TY.type_id\nLEFT JOIN\n pokemon_ability AS PA ON P.pokemon_id = PA.pokemon_id\nLEFT JOIN\n ability AS A ON PA.ability_id = A.ability_id\nGROUP BY\n T.trainer_id, T.trainer_name, T.hometown, R.region_name, P.pokemon_id, P.name, PTN.nickname, PTN.level\nORDER BY\n T.trainer_name, P.name",
+    "timestamp": "2025-11-01T23:02:29.626884",
+    "status": "error: DISTINCT aggregates must have exactly one argument",
+    "database": "pokemon_world",
+    "id": 1
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT\n    T.trainer_name,\n    T.hometown,\n    R.region_name AS trainer_region,\n    P.name AS pokemon_name,\n    PTN.nickname,\n    PTN.level,\n    GROUP_CONCAT(DISTINCT TY.type_name, ', ') AS pokemon_types,\n    GROUP_CONCAT(DISTINCT A.ability_name, ', ') AS pokemon_abilities,\n    (SELECT COUNT(B.battle_id) FROM battle AS B WHERE B.winner_trainer_id = T.trainer_id) AS battles_won_count\nFROM\n    trainer AS T\nJOIN\n    region AS R ON T.region_id = R.region_id\nLEFT JOIN\n    pokemon_trainer AS PTN ON T.trainer_id = PTN.trainer_id\nLEFT JOIN\n    pokemon AS P ON PTN.pokemon_id = P.pokemon_id\nLEFT JOIN\n    pokemon_type AS PTY ON P.pokemon_id = PTY.pokemon_id\nLEFT JOIN\n    type AS TY ON PTY.type_id = TY.type_id\nLEFT JOIN\n    pokemon_ability AS PA ON P.pokemon_id = PA.pokemon_id\nLEFT JOIN\n    ability AS A ON PA.ability_id = A.ability_id\nGROUP BY\n    T.trainer_id, T.trainer_name, T.hometown, R.region_name, P.pokemon_id, P.name, PTN.nickname, PTN.level\nORDER BY\n    T.trainer_name, P.name;",
+    "timestamp": "2025-11-01T23:02:29.642958",
     "status": "success",
     "database": "pokemon_world",
-    "id": 26
+    "id": 2
   },
   {
-    "query": "INSERT INTO region (region_name) VALUES ('Kanto'), ('Johto'), ('Hoenn')",
-    "timestamp": "2025-11-01T18:27:28.581792",
-    "status": "error: UNIQUE constraint failed: region.region_name",
-    "database": "pokemon_world",
-    "id": 27
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\nINSERT INTO region (region_name) VALUES ('Kanto'), ('Johto'), ('Hoenn');",
-    "timestamp": "2025-11-01T18:27:28.597590",
+    "query": "SELECT T1.name AS pokemon_name, T2.region_name FROM pokemon AS T1 JOIN region AS T2 ON T1.region_id = T2.region_id LIMIT 5",
+    "timestamp": "2025-11-01T23:09:56.870460",
     "status": "success",
     "database": "pokemon_world",
-    "id": 28
+    "id": 3
   },
   {
-    "query": "SET FOREIGN_KEY_CHECKS = 0; TRUNCATE TABLE battle_pokemon; TRUNCATE TABLE battle; TRUNCATE TABLE pokemon_trainer; TRUNCATE TABLE trainer; TRUNCATE TABLE pokemon_ability; TRUNCATE TABLE pokemon_type; TRUNCATE TABLE ability; TRUNCATE TABLE type; TRUNCATE TABLE pokemon; TRUNCATE TABLE region; SET FOREIGN_KEY_CHECKS = 1",
-    "timestamp": "2025-11-01T18:28:15.776583",
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT T1.name AS pokemon_name, T2.region_name FROM pokemon AS T1 JOIN region AS T2 ON T1.region_id = T2.region_id LIMIT 5;",
+    "timestamp": "2025-11-01T23:09:56.878947",
     "status": "success",
     "database": "pokemon_world",
-    "id": 29
+    "id": 4
   },
   {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n\n-- 🔒 Disable foreign key checks temporarily\nSET FOREIGN_KEY_CHECKS = 0;\n\nTRUNCATE TABLE battle_pokemon;\nTRUNCATE TABLE battle;\nTRUNCATE TABLE pokemon_trainer;\nTRUNCATE TABLE trainer;\nTRUNCATE TABLE pokemon_ability;\nTRUNCATE TABLE pokemon_type;\nTRUNCATE TABLE ability;\nTRUNCATE TABLE type;\nTRUNCATE TABLE pokemon;\nTRUNCATE TABLE region;\n\n-- 🔓 Re-enable foreign key checks\nSET FOREIGN_KEY_CHECKS = 1;",
-    "timestamp": "2025-11-01T18:28:15.782576",
+    "query": "SELECT T1.name AS pokemon_name, T2.region_name FROM pokemon AS T1 JOIN region AS T2 ON T1.region_id = T2.region_id LIMIT 5; SELECT p.name AS pokemon_name, r.region_name FROM pokemon AS p JOIN region AS r ON p.region_id = r.region_id LIMIT 5",
+    "timestamp": "2025-11-01T23:12:02.653018",
     "status": "success",
     "database": "pokemon_world",
-    "id": 30
+    "id": 5
   },
   {
-    "query": "SET FOREIGN_KEY_CHECKS = 1",
-    "timestamp": "2025-11-01T18:28:22.564776",
-    "status": "error: near \"SET\": syntax error",
-    "database": "pokemon_world",
-    "id": 31
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n\n-- 🔓 Re-enable foreign key checks\nSET FOREIGN_KEY_CHECKS = 1;",
-    "timestamp": "2025-11-01T18:28:22.564776",
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT T1.name AS pokemon_name, T2.region_name FROM pokemon AS T1 JOIN region AS T2 ON T1.region_id = T2.region_id LIMIT 5;\n\nSELECT p.name AS pokemon_name, r.region_name FROM pokemon AS p JOIN region AS r ON p.region_id = r.region_id LIMIT 5;",
+    "timestamp": "2025-11-01T23:12:02.653018",
     "status": "success",
     "database": "pokemon_world",
-    "id": 32
+    "id": 6
   },
   {
-    "query": "INSERT INTO region (region_name) VALUES ('Kanto'), ('Johto'), ('Hoenn')",
-    "timestamp": "2025-11-01T18:28:32.426522",
+    "query": "SELECT T1.trainer_name, T2.nickname, T2.level, T3.location, T3.battle_date FROM trainer AS T1 JOIN pokemon_trainer AS T2 ON T1.trainer_id = T2.trainer_id JOIN battle AS T3 ON T1.trainer_id = T3.winner_trainer_id",
+    "timestamp": "2025-11-01T23:13:00.151392",
     "status": "success",
     "database": "pokemon_world",
-    "id": 33
+    "id": 7
   },
   {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\nINSERT INTO region (region_name) VALUES ('Kanto'), ('Johto'), ('Hoenn');",
-    "timestamp": "2025-11-01T18:28:32.442385",
+    "query": "SELECT T1.trainer_name, T2.nickname, T2.level, T3.location, T3.battle_date FROM trainer AS T1 JOIN pokemon_trainer AS T2 ON T1.trainer_id = T2.trainer_id JOIN battle AS T3 ON T1.trainer_id = T3.winner_trainer_id;",
+    "timestamp": "2025-11-01T23:13:00.166221",
     "status": "success",
     "database": "pokemon_world",
-    "id": 34
+    "id": 8
   },
   {
-    "query": "INSERT INTO type (type_name) VALUES ('Fire'), ('Water'), ('Grass'), ('Electric'), ('Flying')",
-    "timestamp": "2025-11-01T18:28:37.209368",
+    "query": "SELECT T1.trainer_name, T2.nickname, T2.level, T3.location, T3.battle_date FROM trainer AS T1 JOIN pokemon_trainer AS T2 ON T1.trainer_id = T2.trainer_id JOIN battle AS T3 ON T1.trainer_id = T3.winner_trainer_id; SELECT * FROM trainer WHERE trainer_name = 'Ash'",
+    "timestamp": "2025-11-01T23:15:22.317205",
     "status": "success",
     "database": "pokemon_world",
-    "id": 35
+    "id": 9
   },
   {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\nINSERT INTO type (type_name) VALUES ('Fire'), ('Water'), ('Grass'), ('Electric'), ('Flying');",
-    "timestamp": "2025-11-01T18:28:37.229780",
+    "query": "SELECT T1.trainer_name, T2.nickname, T2.level, T3.location, T3.battle_date FROM trainer AS T1 JOIN pokemon_trainer AS T2 ON T1.trainer_id = T2.trainer_id JOIN battle AS T3 ON T1.trainer_id = T3.winner_trainer_id;\n\n\nSELECT * FROM trainer WHERE trainer_name = 'Ash';",
+    "timestamp": "2025-11-01T23:15:22.334696",
     "status": "success",
     "database": "pokemon_world",
-    "id": 36
+    "id": 10
   },
   {
-    "query": "INSERT INTO ability (ability_name, description) VALUES ('Overgrow', 'Boosts Grass moves'), ('Blaze', 'Boosts Fire moves'), ('Torrent', 'Boosts Water moves')",
-    "timestamp": "2025-11-01T18:28:42.582069",
+    "query": "SELECT * FROM trainer WHERE trainer_name = 'Ash'",
+    "timestamp": "2025-11-01T23:15:27.731367",
     "status": "success",
     "database": "pokemon_world",
-    "id": 37
+    "id": 11
   },
   {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n\nINSERT INTO ability (ability_name, description) VALUES\n('Overgrow', 'Boosts Grass moves'),\n('Blaze', 'Boosts Fire moves'),\n('Torrent', 'Boosts Water moves');",
-    "timestamp": "2025-11-01T18:28:42.598216",
+    "query": "SELECT * FROM trainer WHERE trainer_name = 'Ash';",
+    "timestamp": "2025-11-01T23:15:27.746775",
     "status": "success",
     "database": "pokemon_world",
-    "id": 38
+    "id": 12
   },
   {
-    "query": "INSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate) VALUES ('Bulbasaur', 1, 64, 0.7, 6.9, 45), ('Charmander', 1, 62, 0.6, 8.5, 45), ('Squirtle', 1, 63, 0.5, 9.0, 45)",
-    "timestamp": "2025-11-01T18:28:48.591197",
-    "status": "error: FOREIGN KEY constraint failed",
-    "database": "pokemon_world",
-    "id": 39
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n\nINSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate)\nVALUES\n('Bulbasaur', 1, 64, 0.7, 6.9, 45),\n('Charmander', 1, 62, 0.6, 8.5, 45),\n('Squirtle', 1, 63, 0.5, 9.0, 45);",
-    "timestamp": "2025-11-01T18:28:48.601875",
+    "query": "SELECT * FROM trainer",
+    "timestamp": "2025-11-01T23:15:35.783709",
     "status": "success",
     "database": "pokemon_world",
-    "id": 40
+    "id": 13
   },
   {
-    "query": "INSERT INTO region (region_name) VALUES ('Kanto'); INSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate) VALUES ('Bulbasaur', 1, 64, 0.7, 6.9, 45), ('Charmander', 1, 62, 0.6, 8.5, 45), ('Squirtle', 1, 63, 0.5, 9.0, 45)",
-    "timestamp": "2025-11-01T18:29:33.671115",
+    "query": "SELECT * FROM trainer;",
+    "timestamp": "2025-11-01T23:15:35.783709",
     "status": "success",
     "database": "pokemon_world",
-    "id": 41
+    "id": 14
   },
   {
-    "query": "-- First, insert the region if it doesn't exist\nINSERT INTO region (region_name) VALUES ('Kanto');\n\n-- Then insert the pokemon\nINSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate)\nVALUES\n('Bulbasaur', 1, 64, 0.7, 6.9, 45),\n('Charmander', 1, 62, 0.6, 8.5, 45),\n('Squirtle', 1, 63, 0.5, 9.0, 45);",
-    "timestamp": "2025-11-01T18:29:33.679743",
+    "query": "SELECT * FROM trainer WHERE trainer_name = 'Ethan Mangnolia'",
+    "timestamp": "2025-11-01T23:16:40.464916",
     "status": "success",
     "database": "pokemon_world",
-    "id": 42
+    "id": 15
   },
   {
-    "query": "INSERT INTO region (region_name) VALUES ('Kanto')",
-    "timestamp": "2025-11-01T18:29:40.332137",
-    "status": "error: UNIQUE constraint failed: region.region_name",
-    "database": "pokemon_world",
-    "id": 43
-  },
-  {
-    "query": "-- First, insert the region if it doesn't exist\nINSERT INTO region (region_name) VALUES ('Kanto');",
-    "timestamp": "2025-11-01T18:29:40.332137",
+    "query": "SELECT * FROM trainer WHERE trainer_name = 'Ethan Mangnolia';",
+    "timestamp": "2025-11-01T23:16:40.464916",
     "status": "success",
     "database": "pokemon_world",
-    "id": 44
+    "id": 16
   },
   {
-    "query": "INSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate) VALUES ('Bulbasaur', 1, 64, 0.7, 6.9, 45), ('Charmander', 1, 62, 0.6, 8.5, 45), ('Squirtle', 1, 63, 0.5, 9.0, 45)",
-    "timestamp": "2025-11-01T18:29:44.900375",
-    "status": "error: FOREIGN KEY constraint failed",
-    "database": "pokemon_world",
-    "id": 45
-  },
-  {
-    "query": "-- Then insert the pokemon\nINSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate)\nVALUES\n('Bulbasaur', 1, 64, 0.7, 6.9, 45),\n('Charmander', 1, 62, 0.6, 8.5, 45),\n('Squirtle', 1, 63, 0.5, 9.0, 45);",
-    "timestamp": "2025-11-01T18:29:44.906884",
+    "query": "SELECT * FROM trainer WHERE trainer_name = 'Rose'",
+    "timestamp": "2025-11-01T23:16:51.952514",
     "status": "success",
     "database": "pokemon_world",
-    "id": 46
+    "id": 17
   },
   {
-    "query": "CREATE TABLE type (\nname TEXT NOT NULL,\nregion_id INTEGER,\nbase_experience INTEGER,\nheight REAL,\nweight REAL,\ncapture_rate INTEGER,\ntype_id INTEGER,\nability_id INTEGER,\ntrainer_name TEXT NOT NULL,\ngender TEXT 'Female', 'Other'),\nhometown TEXT,\nregion_id INTEGER,\npokemon_id INTEGER,\nnickname TEXT,\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nlocation TEXT,\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\npokemon_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\ntype_id INT AUTO_INCREMENT PRIMARY KEY,\ntype_name VARCHAR(50) NOT NULL UNIQUE\n); CREATE TABLE region (\n region_id INT AUTO_INCREMENT PRIMARY KEY,\nregion_name VARCHAR(50) NOT NULL UNIQUE\n); CREATE TABLE ability (\n ability_id INT AUTO_INCREMENT PRIMARY KEY,\nability_name VARCHAR(100) NOT NULL UNIQUE,\ndescription TEXT\n); CREATE TABLE pokemon (\n pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id),\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id),\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id),\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:35:11.680531",
-    "status": "partial: 2 errors",
-    "database": "pokemon_wworld",
-    "id": 47
-  },
-  {
-    "query": "-- 1️⃣ Type Table\nCREATE TABLE type (\n    type_id INT AUTO_INCREMENT PRIMARY KEY,\n    type_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 2️⃣ Region Table\nCREATE TABLE region (\n    region_id INT AUTO_INCREMENT PRIMARY KEY,\n    region_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 3️⃣ Ability Table\nCREATE TABLE ability (\n    ability_id INT AUTO_INCREMENT PRIMARY KEY,\n    ability_name VARCHAR(100) NOT NULL UNIQUE,\n    description TEXT\n);\n\n-- 4️⃣ Pokémon Table\nCREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 5️⃣ Pokémon-Type Mapping (many-to-many)\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);\n\n-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);\n\n-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);\n\n-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:35:11.688890",
-    "status": "success",
-    "database": "pokemon_wworld",
-    "id": 48
-  },
-  {
-    "query": "CREATE TABLE type (\nname TEXT NOT NULL,\nregion_id INTEGER,\nbase_experience INTEGER,\nheight REAL,\nweight REAL,\ncapture_rate INTEGER,\ntype_id INTEGER,\nability_id INTEGER,\ntrainer_name TEXT NOT NULL,\ngender TEXT 'Female', 'Other'),\nhometown TEXT,\nregion_id INTEGER,\npokemon_id INTEGER,\nnickname TEXT,\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nlocation TEXT,\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\npokemon_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\ntype_id INT AUTO_INCREMENT PRIMARY KEY,\ntype_name VARCHAR(50) NOT NULL UNIQUE\n); CREATE TABLE region (\n region_id INT AUTO_INCREMENT PRIMARY KEY,\nregion_name VARCHAR(50) NOT NULL UNIQUE\n); CREATE TABLE ability (\n ability_id INT AUTO_INCREMENT PRIMARY KEY,\nability_name VARCHAR(100) NOT NULL UNIQUE,\ndescription TEXT\n); CREATE TABLE pokemon (\n pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id),\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id),\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id),\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:35:41.156460",
-    "status": "partial: 4 errors",
-    "database": "pokemon_wworld",
-    "id": 49
-  },
-  {
-    "query": "-- 1️⃣ Type Table\nCREATE TABLE type (\n    type_id INT AUTO_INCREMENT PRIMARY KEY,\n    type_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 2️⃣ Region Table\nCREATE TABLE region (\n    region_id INT AUTO_INCREMENT PRIMARY KEY,\n    region_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 3️⃣ Ability Table\nCREATE TABLE ability (\n    ability_id INT AUTO_INCREMENT PRIMARY KEY,\n    ability_name VARCHAR(100) NOT NULL UNIQUE,\n    description TEXT\n);\n\n-- 4️⃣ Pokémon Table\nCREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 5️⃣ Pokémon-Type Mapping (many-to-many)\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);\n\n-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);\n\n-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);\n\n-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:35:41.166342",
-    "status": "success",
-    "database": "pokemon_wworld",
-    "id": 50
-  },
-  {
-    "query": "CREATE DATABASE pokemon_world; USE pokemon_world; CREATE TABLE type (\n    type_id INT AUTO_INCREMENT PRIMARY KEY,\n    type_name VARCHAR(50) NOT NULL UNIQUE\n); CREATE TABLE region (\n    region_id INT AUTO_INCREMENT PRIMARY KEY,\n    region_name VARCHAR(50) NOT NULL UNIQUE\n); CREATE TABLE ability (\n    ability_id INT AUTO_INCREMENT PRIMARY KEY,\n    ability_name VARCHAR(100) NOT NULL UNIQUE,\n    description TEXT\n); CREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n); CREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n); CREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n); CREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n); CREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n); CREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n); CREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n)",
-    "timestamp": "2025-11-01T18:38:17.169969",
+    "query": "SELECT * FROM trainer WHERE trainer_name = 'Rose';",
+    "timestamp": "2025-11-01T23:16:51.952514",
     "status": "success",
     "database": "pokemon_world",
-    "id": 51
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS type (\ntype_id INTEGER PRIMARY KEY AUTOINCREMENT,\ntype_name INTEGER (50) NOT NULL UNIQUE\n); CREATE TABLE IF NOT EXISTS region ( region_id INT PRIMARY KEY AUTOINCREMENT,\nregion_name INTEGER (50) NOT NULL UNIQUE\n); CREATE TABLE IF NOT EXISTS ability ( ability_id INT PRIMARY KEY AUTOINCREMENT,\nability_name TEXT (100) NOT NULL UNIQUE,\ndescription INTEGER ); CREATE TABLE IF NOT EXISTS pokemon ( pokemon_id INT PRIMARY KEY AUTOINCREMENT,\nname TEXT (100) NOT NULL,\nregion_id INTEGER,\nbase_experience INTEGER,\nheight REAL (4,1),\nweight REAL (4,1),\ncapture_rate INTEGER,\ntype_id INTEGER,\nability_id INTEGER,\ntrainer_name TEXT (100) NOT NULL,\ngender TEXT,\nhometown TEXT (100),\nregion_id INTEGER,\npokemon_id INTEGER,\nnickname TEXT (100),\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nlocation TEXT (100),\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\npokemon_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id),\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id),\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id),\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:41:16.398821",
-    "status": "partial: 1 errors",
-    "database": "pokemon_ssssworld",
-    "id": 52
-  },
-  {
-    "query": "-- 1️⃣ Type Table\nCREATE TABLE type (\n    type_id INT AUTO_INCREMENT PRIMARY KEY,\n    type_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 2️⃣ Region Table\nCREATE TABLE region (\n    region_id INT AUTO_INCREMENT PRIMARY KEY,\n    region_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 3️⃣ Ability Table\nCREATE TABLE ability (\n    ability_id INT AUTO_INCREMENT PRIMARY KEY,\n    ability_name VARCHAR(100) NOT NULL UNIQUE,\n    description TEXT\n);\n\n-- 4️⃣ Pokémon Table\nCREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 5️⃣ Pokémon-Type Mapping (many-to-many)\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);\n\n-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);\n\n-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);\n\n-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:41:16.406255",
-    "status": "success",
-    "database": "pokemon_ssssworld",
-    "id": 53
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS pokemon (\npokemon_id INTEGER PRIMARY KEY AUTOINCREMENT,\nname TEXT (100) NOT NULL,\nregion_id INTEGER,\nbase_experience INTEGER,\nheight REAL (4,1),\nweight REAL (4,1),\ncapture_rate INTEGER,\ntype_id INTEGER,\nability_id INTEGER,\ntrainer_name TEXT (100) NOT NULL,\ngender TEXT,\nhometown TEXT (100),\nregion_id INTEGER,\npokemon_id INTEGER,\nnickname TEXT (100),\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nlocation TEXT (100),\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\npokemon_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id),\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id),\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id),\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:42:02.517354",
-    "status": "error: duplicate column name: region_id",
-    "database": "pokemon_ssssworld",
-    "id": 54
-  },
-  {
-    "query": "-- 4️⃣ Pokémon Table\nCREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 5️⃣ Pokémon-Type Mapping (many-to-many)\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);\n\n-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);\n\n-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);\n\n-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:42:02.517354",
-    "status": "success",
-    "database": "pokemon_ssssworld",
-    "id": 55
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS type (\ntype_id INTEGER PRIMARY KEY AUTOINCREMENT,\ntype_name INTEGER NOT NULL UNIQUE\n); CREATE TABLE IF NOT EXISTS region ( region_id INT PRIMARY KEY AUTOINCREMENT,\nregion_name INTEGER NOT NULL UNIQUE\n); CREATE TABLE IF NOT EXISTS ability ( ability_id INT PRIMARY KEY AUTOINCREMENT,\nability_name TEXT NOT NULL UNIQUE,\ndescription INTEGER ); CREATE TABLE IF NOT EXISTS pokemon ( pokemon_id INT PRIMARY KEY AUTOINCREMENT,\nname TEXT NOT NULL,\nregion_id INTEGER,\nbase_experience INTEGER,\nheight REAL,\nweight REAL,\ncapture_rate INTEGER,\nability_id INTEGER,\ntrainer_name TEXT NOT NULL,\ngender TEXT,\nhometown TEXT,\npokemon_id INTEGER,\nnickname TEXT,\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nlocation TEXT,\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id),\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id),\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id),\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:50:39.740369",
-    "status": "partial: 1 errors",
-    "database": "pokemon_ssworld",
-    "id": 56
-  },
-  {
-    "query": "-- 1️⃣ Type Table\nCREATE TABLE type (\n    type_id INT AUTO_INCREMENT PRIMARY KEY,\n    type_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 2️⃣ Region Table\nCREATE TABLE region (\n    region_id INT AUTO_INCREMENT PRIMARY KEY,\n    region_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 3️⃣ Ability Table\nCREATE TABLE ability (\n    ability_id INT AUTO_INCREMENT PRIMARY KEY,\n    ability_name VARCHAR(100) NOT NULL UNIQUE,\n    description TEXT\n);\n\n-- 4️⃣ Pokémon Table\nCREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 5️⃣ Pokémon-Type Mapping (many-to-many)\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);\n\n-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);\n\n-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);\n\n-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:50:39.740369",
-    "status": "success",
-    "database": "pokemon_ssworld",
-    "id": 57
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS pokemon (\npokemon_id INTEGER PRIMARY KEY AUTOINCREMENT,\nname TEXT NOT NULL,\nregion_id INTEGER,\nbase_experience INTEGER,\nheight REAL,\nweight REAL,\ncapture_rate INTEGER,\ntype_id INTEGER,\nability_id INTEGER,\ntrainer_name TEXT NOT NULL,\ngender TEXT,\nhometown TEXT,\nnickname TEXT,\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nlocation TEXT,\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id),\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id),\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id),\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:51:13.951564",
-    "status": "error: table \"pokemon\" has more than one primary key",
-    "database": "pokemon_ssworld",
-    "id": 58
-  },
-  {
-    "query": "-- 4️⃣ Pokémon Table\nCREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 5️⃣ Pokémon-Type Mapping (many-to-many)\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);\n\n-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);\n\n-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);\n\n-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:51:13.951564",
-    "status": "success",
-    "database": "pokemon_ssworld",
-    "id": 59
-  },
-  {
-    "query": "adasdsd",
-    "timestamp": "2025-11-01T18:54:15.392877",
-    "status": "error: near \"adasdsd\": syntax error",
-    "database": "ascds",
-    "id": 60
-  },
-  {
-    "query": "adasdsd",
-    "timestamp": "2025-11-01T18:54:15.408735",
-    "status": "success",
-    "database": "ascds",
-    "id": 61
-  },
-  {
-    "query": "adasdsd",
-    "timestamp": "2025-11-01T18:54:20.611070",
-    "status": "error: near \"adasdsd\": syntax error",
-    "database": "ascds",
-    "id": 62
-  },
-  {
-    "query": "adasdsd",
-    "timestamp": "2025-11-01T18:54:20.611070",
-    "status": "success",
-    "database": "ascds",
-    "id": 63
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS type (\ntype_id INTEGER PRIMARY KEY AUTOINCREMENT,\ntype_name INTEGER NOT NULL UNIQUE\n); CREATE TABLE IF NOT EXISTS region ( region_id INT PRIMARY KEY AUTOINCREMENT,\nregion_name INTEGER NOT NULL UNIQUE\n); CREATE TABLE IF NOT EXISTS ability ( ability_id INT PRIMARY KEY AUTOINCREMENT,\nability_name TEXT NOT NULL UNIQUE,\ndescription INTEGER ); CREATE TABLE IF NOT EXISTS pokemon ( pokemon_id INT PRIMARY KEY AUTOINCREMENT,\nname TEXT NOT NULL,\nregion_id INTEGER,\nbase_experience INTEGER,\nheight REAL,\nweight REAL,\ncapture_rate INTEGER,\nability_id INTEGER,\ntrainer_name TEXT NOT NULL,\ngender TEXT,\nhometown TEXT,\npokemon_id INTEGER,\nnickname TEXT,\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nlocation TEXT,\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id),\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id),\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id),\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:55:29.103678",
-    "status": "partial: 1 errors",
-    "database": "sspokemon_world",
-    "id": 64
-  },
-  {
-    "query": "-- 1️⃣ Type Table\nCREATE TABLE type (\n    type_id INT AUTO_INCREMENT PRIMARY KEY,\n    type_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 2️⃣ Region Table\nCREATE TABLE region (\n    region_id INT AUTO_INCREMENT PRIMARY KEY,\n    region_name VARCHAR(50) NOT NULL UNIQUE\n);\n\n-- 3️⃣ Ability Table\nCREATE TABLE ability (\n    ability_id INT AUTO_INCREMENT PRIMARY KEY,\n    ability_name VARCHAR(100) NOT NULL UNIQUE,\n    description TEXT\n);\n\n-- 4️⃣ Pokémon Table\nCREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 5️⃣ Pokémon-Type Mapping (many-to-many)\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);\n\n-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);\n\n-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);\n\n-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:55:29.107296",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 65
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS pokemon (\npokemon_id INTEGER PRIMARY KEY AUTOINCREMENT,\nname TEXT NOT NULL,\nregion_id INTEGER,\nbase_experience INTEGER,\nheight REAL,\nweight REAL,\ncapture_rate INTEGER,\nFOREIGN KEY (region_id) REFERENCES region(region_id)\n)",
-    "timestamp": "2025-11-01T18:55:38.146771",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 66
-  },
-  {
-    "query": "-- 4️⃣ Pokémon Table\nCREATE TABLE pokemon (\n    pokemon_id INT AUTO_INCREMENT PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    region_id INT,\n    base_experience INT,\n    height DECIMAL(4,1),\n    weight DECIMAL(4,1),\n    capture_rate INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);",
-    "timestamp": "2025-11-01T18:55:38.210665",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 67
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS pokemon_type (\npokemon_id INTEGER,\ntype_id INTEGER,\nability_id INTEGER,\ntrainer_name TEXT NOT NULL,\ngender TEXT,\nhometown TEXT,\nregion_id INTEGER,\nnickname TEXT,\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nlocation TEXT,\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id),\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id),\nFOREIGN KEY (region_id) REFERENCES region(region_id),\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id),\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:55:47.013270",
-    "status": "error: table \"pokemon_type\" has more than one primary key",
-    "database": "sspokemon_world",
-    "id": 68
-  },
-  {
-    "query": "-- 5️⃣ Pokémon-Type Mapping (many-to-many)\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);\n\n-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);\n\n-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);\n\n-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);\n\n-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:55:47.023890",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 69
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS pokemon_type (\npokemon_id INTEGER,\ntype_id INTEGER,\nPRIMARY KEY (pokemon_id, type_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (type_id) REFERENCES type(type_id)\n)",
-    "timestamp": "2025-11-01T18:56:00.694885",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 70
-  },
-  {
-    "query": "-- 5️⃣ Pokémon-Type Mapping (many-to-many)\nCREATE TABLE pokemon_type (\n    pokemon_id INT,\n    type_id INT,\n    PRIMARY KEY (pokemon_id, type_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (type_id) REFERENCES type(type_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:56:00.757645",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 71
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS pokemon_ability (\npokemon_id INTEGER,\nability_id INTEGER,\nPRIMARY KEY (pokemon_id, ability_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (ability_id) REFERENCES ability(ability_id)\n)",
-    "timestamp": "2025-11-01T18:56:16.804949",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 72
-  },
-  {
-    "query": "-- 6️⃣ Pokémon-Ability Mapping (many-to-many)\nCREATE TABLE pokemon_ability (\n    pokemon_id INT,\n    ability_id INT,\n    PRIMARY KEY (pokemon_id, ability_id),\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (ability_id) REFERENCES ability(ability_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:56:16.860171",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 73
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS trainer (\ntrainer_id INTEGER PRIMARY KEY AUTOINCREMENT,\ntrainer_name TEXT NOT NULL,\ngender TEXT,\nhometown TEXT,\nregion_id INTEGER,\nFOREIGN KEY (region_id) REFERENCES region(region_id)\n)",
-    "timestamp": "2025-11-01T18:56:27.197282",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 74
-  },
-  {
-    "query": "-- 7️⃣ Trainer Table\nCREATE TABLE trainer (\n    trainer_id INT AUTO_INCREMENT PRIMARY KEY,\n    trainer_name VARCHAR(100) NOT NULL,\n    gender ENUM('Male', 'Female', 'Other'),\n    hometown VARCHAR(100),\n    region_id INT,\n    FOREIGN KEY (region_id) REFERENCES region(region_id)\n);",
-    "timestamp": "2025-11-01T18:56:27.260859",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 75
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS pokemon_trainer (\ntrainer_id INTEGER,\npokemon_id INTEGER,\nnickname TEXT,\nlevel INTEGER DEFAULT 1,\ncaught_date TEXT,\nPRIMARY KEY (trainer_id, pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id)\n)",
-    "timestamp": "2025-11-01T18:56:41.947040",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 76
-  },
-  {
-    "query": "-- 8️⃣ Pokémon-Trainer Mapping (many-to-many)\nCREATE TABLE pokemon_trainer (\n    trainer_id INT,\n    pokemon_id INT,\n    nickname VARCHAR(100),\n    level INT DEFAULT 1,\n    caught_date DATE,\n    PRIMARY KEY (trainer_id, pokemon_id),\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:56:42.010279",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 77
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS battle (\nbattle_id INTEGER PRIMARY KEY AUTOINCREMENT,\nlocation TEXT,\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\npokemon_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id),\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:56:45.119530",
-    "status": "error: table \"battle\" has more than one primary key",
-    "database": "sspokemon_world",
-    "id": 78
-  },
-  {
-    "query": "-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);\n\n-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:56:45.145233",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 79
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS battle (\nbattle_id INTEGER PRIMARY KEY AUTOINCREMENT,\nlocation TEXT,\nbattle_date TEXT,\nwinner_trainer_id INTEGER,\nFOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:56:49.232555",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 80
-  },
-  {
-    "query": "-- 9️⃣ Battle Table\nCREATE TABLE battle (\n    battle_id INT AUTO_INCREMENT PRIMARY KEY,\n    location VARCHAR(100),\n    battle_date DATE,\n    winner_trainer_id INT,\n    FOREIGN KEY (winner_trainer_id) REFERENCES trainer(trainer_id)\n);",
-    "timestamp": "2025-11-01T18:56:49.296180",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 81
-  },
-  {
-    "query": "CREATE TABLE IF NOT EXISTS battle_pokemon (\nbattle_id INTEGER,\npokemon_id INTEGER,\ntrainer_id INTEGER,\nis_winner INTEGER,\nPRIMARY KEY (battle_id, pokemon_id),\nFOREIGN KEY (battle_id) REFERENCES battle(battle_id),\nFOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id),\nFOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id)\n)",
-    "timestamp": "2025-11-01T18:56:53.289573",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 82
-  },
-  {
-    "query": "-- 🔟 Battle-Pokémon Mapping (Pokémon participating in each battle)\nCREATE TABLE battle_pokemon (\n    battle_id INT,\n    pokemon_id INT,\n    trainer_id INT,\n    is_winner BOOLEAN,\n    PRIMARY KEY (battle_id, pokemon_id),\n    FOREIGN KEY (battle_id) REFERENCES battle(battle_id) ON DELETE CASCADE,\n    FOREIGN KEY (pokemon_id) REFERENCES pokemon(pokemon_id) ON DELETE CASCADE,\n    FOREIGN KEY (trainer_id) REFERENCES trainer(trainer_id) ON DELETE CASCADE\n);",
-    "timestamp": "2025-11-01T18:56:53.368870",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 83
-  },
-  {
-    "query": "INSERT INTO region (region_name) VALUES ('Kanto'), ('Johto'), ('Hoenn'); INSERT INTO type (type_name) VALUES ('Fire'), ('Water'), ('Grass'), ('Electric'), ('Flying'); INSERT INTO ability (ability_name, description) VALUES\n('Overgrow', 'Boosts Grass moves'),\n('Blaze', 'Boosts Fire moves'),\n('Torrent', 'Boosts Water moves'); INSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate)\nVALUES\n('Bulbasaur', 1, 64, 0.7, 6.9, 45),\n('Charmander', 1, 62, 0.6, 8.5, 45),\n('Squirtle', 1, 63, 0.5, 9.0, 45)",
-    "timestamp": "2025-11-01T18:57:01.960148",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 84
-  },
-  {
-    "query": "INSERT INTO region (region_name) VALUES ('Kanto'), ('Johto'), ('Hoenn');\n\nINSERT INTO type (type_name) VALUES ('Fire'), ('Water'), ('Grass'), ('Electric'), ('Flying');\n\nINSERT INTO ability (ability_name, description) VALUES\n('Overgrow', 'Boosts Grass moves'),\n('Blaze', 'Boosts Fire moves'),\n('Torrent', 'Boosts Water moves');\n\nINSERT INTO pokemon (name, region_id, base_experience, height, weight, capture_rate)\nVALUES\n('Bulbasaur', 1, 64, 0.7, 6.9, 45),\n('Charmander', 1, 62, 0.6, 8.5, 45),\n('Squirtle', 1, 63, 0.5, 9.0, 45);",
-    "timestamp": "2025-11-01T18:57:01.973844",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 85
-  },
-  {
-    "query": "INSERT INTO pokemon_type VALUES\n(1, 3),\n(2, 1),\n(3, 2); INSERT INTO pokemon_ability VALUES\n(1, 1),\n(2, 2),\n(3, 3); INSERT INTO trainer (trainer_name, gender, hometown, region_id)\nVALUES ('Ash', 'Male', 'Pallet Town', 1),",
-    "timestamp": "2025-11-01T18:57:11.278037",
-    "status": "partial: 1 errors",
-    "database": "sspokemon_world",
-    "id": 86
-  },
-  {
-    "query": "INSERT INTO pokemon_type VALUES\n(1, 3),  -- Bulbasaur -> Grass\n(2, 1),  -- Charmander -> Fire\n(3, 2);  -- Squirtle -> Water\n\nINSERT INTO pokemon_ability VALUES\n(1, 1),\n(2, 2),\n(3, 3);\n\nINSERT INTO trainer (trainer_name, gender, hometown, region_id)\nVALUES ('Ash', 'Male', 'Pallet Town', 1),",
-    "timestamp": "2025-11-01T18:57:11.289392",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 87
-  },
-  {
-    "query": "INSERT INTO trainer (trainer_name, gender, hometown, region_id)\nVALUES ('Ash', 'Male', 'Pallet Town', 1),\n ('Misty', 'Female', 'Cerulean City', 1)",
-    "timestamp": "2025-11-01T18:57:21.504280",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 88
-  },
-  {
-    "query": "INSERT INTO trainer (trainer_name, gender, hometown, region_id)\nVALUES ('Ash', 'Male', 'Pallet Town', 1),\n       ('Misty', 'Female', 'Cerulean City', 1);",
-    "timestamp": "2025-11-01T18:57:21.530553",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 89
-  },
-  {
-    "query": "INSERT INTO pokemon_trainer (trainer_id, pokemon_id, nickname, level, caught_date)\nVALUES (1, 2, 'Blaze', 12, '2024-07-10'),\n (2, 3, 'Splashy', 10, '2024-07-12')",
-    "timestamp": "2025-11-01T18:57:28.876109",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 90
-  },
-  {
-    "query": "INSERT INTO pokemon_trainer (trainer_id, pokemon_id, nickname, level, caught_date)\nVALUES (1, 2, 'Blaze', 12, '2024-07-10'),\n       (2, 3, 'Splashy', 10, '2024-07-12');",
-    "timestamp": "2025-11-01T18:57:28.909663",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 91
-  },
-  {
-    "query": "SELECT\n p.pokemon_id,\n p.name AS pokemon_name,\n r.region_name,\n t.type_name,\n a.ability_name,\n a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id",
-    "timestamp": "2025-11-01T18:58:20.913552",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 92
-  },
-  {
-    "query": "SELECT \n    p.pokemon_id,\n    p.name AS pokemon_name,\n    r.region_name,\n    t.type_name,\n    a.ability_name,\n    a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id;",
-    "timestamp": "2025-11-01T18:58:20.919343",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 93
-  },
-  {
-    "query": "SELECT\n p.pokemon_id,\n p.name AS pokemon_name,\n r.region_name,\n t.type_name,\n a.ability_name,\n a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id",
-    "timestamp": "2025-11-01T19:01:29.581047",
-    "status": "error: no such table: pokemon",
-    "database": "pokemon_ssworld",
-    "id": 94
-  },
-  {
-    "query": "SELECT \n    p.pokemon_id,\n    p.name AS pokemon_name,\n    r.region_name,\n    t.type_name,\n    a.ability_name,\n    a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id;",
-    "timestamp": "2025-11-01T19:01:29.600128",
-    "status": "success",
-    "database": "pokemon_ssworld",
-    "id": 95
-  },
-  {
-    "query": "SELECT\n p.pokemon_id,\n p.name AS pokemon_name,\n r.region_name,\n t.type_name,\n a.ability_name,\n a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id",
-    "timestamp": "2025-11-01T19:01:42.188298",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 96
-  },
-  {
-    "query": "SELECT \n    p.pokemon_id,\n    p.name AS pokemon_name,\n    r.region_name,\n    t.type_name,\n    a.ability_name,\n    a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id;",
-    "timestamp": "2025-11-01T19:01:42.197827",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 97
-  },
-  {
-    "query": "SELECT\n p.pokemon_id,\n p.name AS pokemon_name,\n r.region_name,\n t.type_name,\n a.ability_name,\n a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id",
-    "timestamp": "2025-11-01T19:12:03.404743",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 98
-  },
-  {
-    "query": "SELECT \n    p.pokemon_id,\n    p.name AS pokemon_name,\n    r.region_name,\n    t.type_name,\n    a.ability_name,\n    a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id;",
-    "timestamp": "2025-11-01T19:12:03.414002",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 99
-  },
-  {
-    "query": "SELECT\n p.pokemon_id,\n p.name AS pokemon_name,\n r.region_name,\n t.type_name,\n a.ability_name,\n a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id",
-    "timestamp": "2025-11-01T19:15:22.373227",
-    "status": "error: no such table: pokemon",
-    "database": "company_db;",
-    "id": 100
-  },
-  {
-    "query": "SELECT \n    p.pokemon_id,\n    p.name AS pokemon_name,\n    r.region_name,\n    t.type_name,\n    a.ability_name,\n    a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id;",
-    "timestamp": "2025-11-01T19:15:22.373227",
-    "status": "success",
-    "database": "company_db;",
-    "id": 101
-  },
-  {
-    "query": "SELECT\n p.pokemon_id,\n p.name AS pokemon_name,\n r.region_name,\n t.type_name,\n a.ability_name,\n a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id",
-    "timestamp": "2025-11-01T19:15:30.754651",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT \n    p.pokemon_id,\n    p.name AS pokemon_name,\n    r.region_name,\n    t.type_name,\n    a.ability_name,\n    a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id;",
-    "timestamp": "2025-11-01T19:15:30.762275",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT\n p.pokemon_id,\n p.name AS pokemon_name,\n r.region_name,\n t.type_name,\n a.ability_name,\n a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id",
-    "timestamp": "2025-11-01T19:17:49.773852",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT \n    p.pokemon_id,\n    p.name AS pokemon_name,\n    r.region_name,\n    t.type_name,\n    a.ability_name,\n    a.description\nFROM pokemon p\nJOIN region r ON p.region_id = r.region_id\nJOIN pokemon_type pt ON p.pokemon_id = pt.pokemon_id\nJOIN type t ON pt.type_id = t.type_id\nJOIN pokemon_ability pa ON p.pokemon_id = pa.pokemon_id\nJOIN ability a ON pa.ability_id = a.ability_id;",
-    "timestamp": "2025-11-01T19:17:49.773852",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT * FROM pokemon",
-    "timestamp": "2025-11-01T19:19:49.967856",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT * FROM pokemon;",
-    "timestamp": "2025-11-01T19:19:49.983508",
-    "status": "success",
-    "database": "sspokemon_world",
-    "id": 101
-  },
-  {
-    "query": "select * from type",
-    "timestamp": "2025-11-01T19:38:15.491338",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nselect * from type",
-    "timestamp": "2025-11-01T19:38:15.500565",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id; select * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:41:47.717321",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id;\n\n\nselect * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:41:47.733145",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id",
-    "timestamp": "2025-11-01T19:41:57.149850",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id;",
-    "timestamp": "2025-11-01T19:41:57.149850",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id; select * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:42:03.622347",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT T1.name, T2.region_name FROM pokemon AS T1 INNER JOIN region AS T2 ON T1.region_id = T2.region_id;\n\n\nselect * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:42:03.645615",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "select * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:42:08.419488",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n\nselect * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:42:08.443801",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "select * from battle; select * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:43:52.304409",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\nselect * from battle;\n\n\nselect * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:43:52.320250",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "select * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:45:24.765946",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\n\n\n\nselect * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:45:24.769100",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT * FROM pokemon_trainer WHERE trainer_id = 47; select * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:46:54.497671",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT * FROM pokemon_trainer WHERE trainer_id = 47;\n\nselect * from pokemon_trainer",
-    "timestamp": "2025-11-01T19:46:54.513846",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "SELECT * FROM pokemon_trainer WHERE trainer_id = 47",
-    "timestamp": "2025-11-01T19:46:57.678399",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
-  },
-  {
-    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT * FROM pokemon_trainer WHERE trainer_id = 47;",
-    "timestamp": "2025-11-01T19:46:57.678399",
-    "status": "success",
-    "database": "pokemon_world",
-    "id": 101
+    "id": 18
   }
 ]
