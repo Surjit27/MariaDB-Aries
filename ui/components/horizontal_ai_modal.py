@@ -406,12 +406,29 @@ class HorizontalAIModal:
         # Insert role header
         self.chat_text.insert(tk.END, f"{role_emoji} {role.upper()}: ", role_tag)
         
-        # Insert content
-        self.chat_text.insert(tk.END, f"{content}\n", "normal_text")
+        # If suggestion_data is provided AND content is empty, skip showing content
+        # (the suggestion block will display it instead)
+        # Only show content if there's no suggestion_data, OR if content is non-empty and different from suggestion's new_code
+        should_show_content = True
+        if suggestion_data and suggestion_data.get('new_code'):
+            # If content matches the new_code in suggestion, don't show it twice
+            if not content or content.strip() == suggestion_data.get('new_code', '').strip():
+                should_show_content = False
         
-        # Record in rolling session context
+        # Insert content (only if not duplicated in suggestion block)
+        if should_show_content:
+            self.chat_text.insert(tk.END, f"{content}\n", "normal_text")
+        else:
+            # Just add a newline after the role header
+            self.chat_text.insert(tk.END, "\n", "normal_text")
+        
+        # Record in rolling session context (use content or suggestion's new_code)
+        context_content = content
+        if suggestion_data and suggestion_data.get('new_code') and not context_content:
+            context_content = suggestion_data.get('new_code')
+        
         try:
-            self.session_context.append({'role': role, 'content': content})
+            self.session_context.append({'role': role, 'content': context_content})
             if len(self.session_context) > self._max_context_items:
                 self.session_context = self.session_context[-self._max_context_items:]
         except Exception:
@@ -467,18 +484,16 @@ class HorizontalAIModal:
         # Add smooth fade-in effect
         self.animate_message_fade()
         
-        # If assistant returned SQL, show compact Keep/Reject actions
+        # If assistant returned SQL with suggestion_data, show compact Keep/Reject actions
+        # NOTE: Do NOT auto-add suggestion block here - let the caller decide when to add it
+        # This prevents duplicate suggestion blocks when _add_suggestion_block is called explicitly
         try:
             if role == "assistant":
                 if suggestion_data and suggestion_data.get('new_code'):
-                    # Suggestion already rendered; nothing else needed
+                    # Suggestion already rendered via add_code_suggestion_inline; nothing else needed
                     pass
-                elif self._looks_like_sql(content or ""):
-                    # Render compact suggestion for plain SQL answer
-                    try:
-                        self._add_suggestion_block("", content)
-                    except Exception:
-                        pass
+                # Removed auto-suggestion block for plain SQL - caller should explicitly call _add_suggestion_block
+                # This prevents duplication when suggestion_block is added explicitly after add_chat_message
         except Exception:
             pass
     
@@ -493,6 +508,20 @@ class HorizontalAIModal:
         
         # Add AI Suggestion label
         self.chat_text.insert(tk.END, "💡 AI Suggestion:\n", "ai_suggestion_label")
+        
+        # Add explanation if available (from suggestion_data)
+        if suggestion_data.get('explanation'):
+            explanation = suggestion_data['explanation']
+            # Format explanation nicely (wrap to 3-4 lines if needed)
+            self.chat_text.insert(tk.END, f"📝 Explanation: ", "ai_suggestion_label")
+            self.chat_text.insert(tk.END, f"{explanation}\n\n", "normal_text")
+        else:
+            # If no explanation provided by AI, add a default brief explanation
+            # This helps users understand what the query does
+            if suggestion_data.get('new_code'):
+                self.chat_text.insert(tk.END, f"📝 Explanation: ", "ai_suggestion_label")
+                default_explanation = "This SQL query will be inserted into your editor. Review it and click Keep to apply or Reject to discard."
+                self.chat_text.insert(tk.END, f"{default_explanation}\n\n", "normal_text")
         
         # Add old code (if exists) - only show if there's existing code to replace
         if suggestion_data.get('old_code') and suggestion_data['old_code']:
@@ -541,15 +570,19 @@ class HorizontalAIModal:
             pass
         
         # Insert buttons inline using window_create (compact spacing)
+        # Store the position before inserting buttons so we can replace them later
+        button_start_pos = self.chat_text.index(tk.END)
+        
         keep_btn_ref = keep_btn
         discard_btn_ref = discard_btn
         # Now that refs exist, bind commands
-        keep_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_keep_action(s, kb, rb))
-        discard_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_reject_action(s, kb, rb))
+        keep_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_keep_action(s, kb, rb, button_start_pos))
+        discard_btn_ref.configure(command=lambda s=suggestion_data, kb=keep_btn_ref, rb=discard_btn_ref: self._compact_reject_action(s, kb, rb, button_start_pos))
 
         self.chat_text.window_create(tk.END, window=keep_btn_ref)
         self.chat_text.insert(tk.END, "    ")
         self.chat_text.window_create(tk.END, window=discard_btn_ref)
+        button_end_pos = self.chat_text.index(tk.END)
         self.chat_text.insert(tk.END, "\n", "normal_text")
         
         # Store button references for tracking
@@ -557,7 +590,9 @@ class HorizontalAIModal:
         self.inline_buttons[suggestion_id] = {
             'keep': keep_btn_ref,
             'discard': discard_btn_ref,
-            'data': suggestion_data
+            'data': suggestion_data,
+            'button_start': button_start_pos,
+            'button_end': button_end_pos
         }
         
         # Auto-resize after adding suggestion (visual only)
@@ -589,27 +624,13 @@ class HorizontalAIModal:
                 inserted_start = cursor_pos
                 inserted_end = self.sql_editor.editor.index(f"{cursor_pos}+{len(text)}c")
             
-            # Highlight applied code in green (persistent until user interacts)
+            # Store range for undo (no highlighting - just insert as regular query)
             if inserted_start and inserted_end:
-                # Use a more visible green highlight that persists
-                self.sql_editor.editor.tag_configure("ai_accepted", 
-                                                    background="#4CAF50",  # Bright green
-                                                    foreground="#000000",
-                                                    relief="flat",
-                                                    borderwidth=0)
-                self.sql_editor.editor.tag_add("ai_accepted", inserted_start, inserted_end)
+                # Move cursor to end of inserted text
+                self.sql_editor.editor.mark_set(tk.INSERT, inserted_end)
+                self.sql_editor.editor.see(inserted_end)
                 
-                # Also select/highlight the inserted query for easy re-optimization
-                # Remove any existing manual highlights first
-                self.sql_editor.editor.tag_remove("manual_highlight", "1.0", tk.END)
-                # Add manual highlight (yellow) so user can optimize it
-                self.sql_editor.editor.tag_add("manual_highlight", inserted_start, inserted_end)
-                
-                # Select the text so it's visible
-                self.sql_editor.editor.mark_set(tk.INSERT, inserted_start)
-                self.sql_editor.editor.see(inserted_start)
-                
-                # Store range for undo and re-optimization
+                # Store range for undo functionality
                 try:
                     self.sql_editor.editor.tag_remove("ai_last_insert", "1.0", tk.END)
                 except Exception:
@@ -627,39 +648,90 @@ class HorizontalAIModal:
             print(f"Error applying suggestion: {e}")
             self.add_confirmation_message(f"❌ Error applying suggestion: {str(e)}")
 
-    def _compact_keep_action(self, suggestion_data, keep_btn_ref, discard_btn_ref):
+    def _compact_keep_action(self, suggestion_data, keep_btn_ref, discard_btn_ref, button_start_pos):
+        """Handle Keep button click - remove buttons and show 'Query accepted' text."""
         try:
+            # Remove buttons and replace with text
+            try:
+                # Destroy button widgets
+                keep_btn_ref.destroy()
+                discard_btn_ref.destroy()
+                
+                # Delete the button area and insert status text
+                button_end_pos = self.chat_text.index(f"{button_start_pos}+1c")  # Approximate end
+                # Try to find where buttons actually end
+                try:
+                    # Find the end of button area by looking for the next newline
+                    content = self.chat_text.get(button_start_pos, f"{button_start_pos} lineend")
+                    if "    " in content or "\n" in content:
+                        # Buttons are on this line, replace up to newline
+                        line_end = self.chat_text.index(f"{button_start_pos} lineend")
+                        self.chat_text.delete(button_start_pos, line_end)
+                    else:
+                        # Fallback: delete a reasonable amount
+                        self.chat_text.delete(button_start_pos, f"{button_start_pos}+50c")
+                except Exception:
+                    # Fallback: just delete a chunk
+                    try:
+                        self.chat_text.delete(button_start_pos, f"{button_start_pos}+50c")
+                    except Exception:
+                        pass
+                
+                # Insert "Query accepted" text (no margin, use normal_text like other text)
+                self.chat_text.insert(button_start_pos, "✅ Query accepted\n", "normal_text")
+            except Exception as e:
+                print(f"Error removing buttons: {e}")
+            
+            # Call the main handler
             self.handle_keep_suggestion(suggestion_data)
+        except Exception as e:
+            print(f"Error in keep action: {e}")
+            # Fallback: just disable buttons if removal fails
             try:
-                keep_btn_ref.config(text="Query inserted", state=tk.DISABLED, fg="#28a745", font=("Arial", 9))
+                keep_btn_ref.config(text="Query accepted", state=tk.DISABLED, fg="#28a745", font=("Arial", 9))
                 discard_btn_ref.config(state=tk.DISABLED)
             except Exception:
                 pass
-        except Exception:
-            pass
 
-    def _compact_reject_action(self, suggestion_data, keep_btn_ref, discard_btn_ref):
-        """Handle reject action - discard suggestion."""
+    def _compact_reject_action(self, suggestion_data, keep_btn_ref, discard_btn_ref, button_start_pos):
+        """Handle reject action - remove buttons and show 'Query rejected' text."""
         try:
-            # Disable buttons immediately to prevent double-clicking
+            # Remove buttons and replace with text
             try:
-                discard_btn_ref.config(state=tk.DISABLED)
-                keep_btn_ref.config(state=tk.DISABLED)
-            except Exception:
-                pass
+                # Destroy button widgets
+                keep_btn_ref.destroy()
+                discard_btn_ref.destroy()
+                
+                # Delete the button area and insert status text
+                button_end_pos = self.chat_text.index(f"{button_start_pos}+1c")  # Approximate end
+                # Try to find where buttons actually end
+                try:
+                    # Find the end of button area by looking for the next newline
+                    content = self.chat_text.get(button_start_pos, f"{button_start_pos} lineend")
+                    if "    " in content or "\n" in content:
+                        # Buttons are on this line, replace up to newline
+                        line_end = self.chat_text.index(f"{button_start_pos} lineend")
+                        self.chat_text.delete(button_start_pos, line_end)
+                    else:
+                        # Fallback: delete a reasonable amount
+                        self.chat_text.delete(button_start_pos, f"{button_start_pos}+50c")
+                except Exception:
+                    # Fallback: just delete a chunk
+                    try:
+                        self.chat_text.delete(button_start_pos, f"{button_start_pos}+50c")
+                    except Exception:
+                        pass
+                
+                # Insert "Query rejected" text (no margin, use normal_text like other text)
+                self.chat_text.insert(button_start_pos, "❌ Query rejected\n", "normal_text")
+            except Exception as e:
+                print(f"Error removing buttons: {e}")
             
             # Call the main handler
             self.handle_discard_suggestion(suggestion_data)
-            
-            # Update button appearance after rejection
-            try:
-                discard_btn_ref.config(text="Query rejected", state=tk.DISABLED, fg="#dc3545", font=("Arial", 9))
-                keep_btn_ref.config(state=tk.DISABLED)
-            except Exception as e:
-                print(f"Error updating reject button: {e}")
         except Exception as e:
             print(f"Error in reject action: {e}")
-            # Still try to disable buttons even if handler fails
+            # Fallback: just disable buttons if removal fails
             try:
                 discard_btn_ref.config(text="Query rejected", state=tk.DISABLED, fg="#dc3545", font=("Arial", 9))
                 keep_btn_ref.config(state=tk.DISABLED)
@@ -674,8 +746,8 @@ class HorizontalAIModal:
         if suggestion_data.get('old_start') and suggestion_data.get('old_end'):
             self.remove_old_highlight(suggestion_data['old_start'], suggestion_data['old_end'])
         
-        # Add discard message to chat
-        self.add_confirmation_message("❌ Query rejected")
+        # Don't add discard message here - "Query rejected" is already shown by _compact_reject_action
+        # This prevents duplicate messages
         
         # Disable buttons
         self.disable_suggestion_buttons(suggestion_data)
@@ -713,7 +785,8 @@ class HorizontalAIModal:
     def add_confirmation_with_optimize_again(self, start_pos, end_pos, query_text):
         """Add confirmation message with Optimize Again button."""
         try:
-            self.chat_text.insert(tk.END, "✅ Query inserted\n", "separator")
+            # Don't show "Query inserted" here - "Query accepted" is already shown by _compact_keep_action
+            # Just add the "Optimize Again" button
             
             # Create "Optimize Again" button
             optimize_btn = tk.Button(self.chat_text,
@@ -747,13 +820,14 @@ class HorizontalAIModal:
             
             optimize_btn.configure(command=optimize_again)
             
-            # Insert button inline
+            # Insert button inline (no spacing before - align to margin like other text)
+            self.chat_text.insert(tk.END, " ", "normal_text")  # Just a single space
             self.chat_text.window_create(tk.END, window=optimize_btn)
-            self.chat_text.insert(tk.END, "\n\n", "separator")
+            self.chat_text.insert(tk.END, "\n", "normal_text")
             self.chat_text.see(tk.END)
         except Exception as e:
             print(f"Error adding optimize again button: {e}")
-            self.add_confirmation_message("✅ Query inserted")
+            # Don't show duplicate message on error - "Query accepted" is already shown
     
     def animate_message_fade(self):
         """Animate fade-in effect for new messages."""
@@ -842,15 +916,7 @@ class HorizontalAIModal:
                                font=("Arial", 9, "bold"), fg="#ffffff", bg="#2d2d2d")
         history_title.pack(side=tk.LEFT)
         
-        clear_btn = tk.Button(history_header, text="🗑️ Clear", 
-                            command=self.clear_history,
-                            bg="#666666", fg="#ffffff", bd=0,
-                            font=("Arial", 8), 
-                            width=6, height=1,
-                            activebackground="#888888", 
-                            activeforeground="#ffffff",
-                            relief="flat")
-        clear_btn.pack(side=tk.RIGHT)
+        # Clear button removed - users cannot clear the modal
         
         # History scrollable area
         history_container = tk.Frame(self.history_frame, bg="#2d2d2d")
@@ -1544,17 +1610,18 @@ Please complete the query using the database schema and ensure it's syntacticall
                         self.input_entry.configure(state="normal")
                         self.input_var.set("")
                         return
-                    ai_sql_clean = self._clean_sql_display(ai_sql)
+                    # Parse AI response to extract explanation and SQL
+                    parsed = self._parse_ai_response(ai_sql)
+                    ai_sql_clean = parsed['sql']
+                    explanation = parsed.get('explanation')
+                    
                     if not self._looks_like_sql(ai_sql_clean):
                         self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
                         self.input_entry.configure(state="normal")
                         self.input_var.set("")
                         return
-                    # Show assistant response (user message already added above)
-                    merged = f"{banner}{ai_sql_clean}\n"
-                    self.add_chat_message("assistant", merged)
-                    # Add suggestion with NEW only (no OLD)
-                    self._add_suggestion_block("", ai_sql_clean)
+                    # Add suggestion with NEW only (no OLD) and explanation
+                    self._add_suggestion_block("", ai_sql_clean, explanation=explanation)
                     self.input_entry.configure(state="normal")
                     self.input_var.set("")
                     if hasattr(self, 'chat_text'):
@@ -1610,8 +1677,11 @@ Please provide an improved version of this query. Consider:
                     self.input_entry.configure(state="normal")
                     self.input_var.set("")
                     return
-                # Clean and merge display
-                ai_sql_clean = self._clean_sql_display(ai_sql)
+                # Parse AI response to extract explanation and SQL
+                parsed = self._parse_ai_response(ai_sql)
+                ai_sql_clean = parsed['sql']
+                explanation = parsed.get('explanation')
+                
                 # Non-SQL detection on response
                 if not self._looks_like_sql(ai_sql_clean):
                     self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
@@ -1626,8 +1696,6 @@ Please provide an improved version of this query. Consider:
                     self.input_entry.configure(state="normal")
                     self.input_var.set("")
                     return
-                # Merge banner + SQL as single assistant line before suggestion block
-                merged = f"{banner}{ai_sql_clean}\n"
                 # Determine selection positions (best-effort)
                 sel_start, sel_end = None, None
                 try:
@@ -1635,13 +1703,8 @@ Please provide an improved version of this query. Consider:
                     sel_end = self.sql_editor.editor.index(tk.SEL_LAST)
                 except Exception:
                     pass
-                # Show merged assistant text and suggestion block
-                self.add_chat_message("assistant", merged, {
-                    'old_code': seltext,
-                    'new_code': ai_sql_clean,
-                    'old_start': sel_start,
-                    'old_end': sel_end
-                })
+                # Show suggestion block with explanation
+                self._add_suggestion_block(seltext, ai_sql_clean, sel_start, sel_end, explanation=explanation)
                 # Also show quick actions for convenience
                 try:
                     self._create_inline_actions_bar(ai_sql_clean)
@@ -1700,7 +1763,11 @@ This could be a simple SELECT query that shows data from one or more tables."""
                     self.input_entry.configure(state="normal")
                     self.input_var.set("")
                     return
-                ai_sql_clean = self._clean_sql_display(ai_sql)
+                # Parse AI response to extract explanation and SQL
+                parsed = self._parse_ai_response(ai_sql)
+                ai_sql_clean = parsed['sql']
+                explanation = parsed.get('explanation')
+                
                 if not self._looks_like_sql(ai_sql_clean):
                     self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
                     self.input_entry.configure(state="normal")
@@ -1708,11 +1775,9 @@ This could be a simple SELECT query that shows data from one or more tables."""
                     return
                 # Show user and assistant messages
                 self.add_chat_message("user", "Generate starter SQL query")
-                merged = f"{banner}{ai_sql_clean}\n"
-                self.add_chat_message("assistant", merged)
-                # Explicitly add compact Keep/Reject
+                # Use _add_suggestion_block with explanation
                 try:
-                    self._add_suggestion_block("", ai_sql_clean)
+                    self._add_suggestion_block("", ai_sql_clean, explanation=explanation)
                 except Exception:
                     pass
                 self.input_entry.configure(state="normal")
@@ -1762,11 +1827,14 @@ Generate a complete, executable SQL query that fulfills the user's request."""
                     self.input_entry.configure(state="normal")
                     self.input_var.set("")
                     return
-                ai_sql_clean = self._clean_sql_display(ai_sql)
-                self.add_chat_message("assistant", ai_sql_clean)
-                # Explicitly add compact Keep/Reject
+                # Parse AI response to extract explanation and SQL
+                parsed = self._parse_ai_response(ai_sql)
+                ai_sql_clean = parsed['sql']
+                explanation = parsed.get('explanation')
+                
+                # Use _add_suggestion_block directly - it will show the assistant message with suggestion
                 try:
-                    self._add_suggestion_block("", ai_sql_clean)
+                    self._add_suggestion_block("", ai_sql_clean, explanation=explanation)
                 except Exception:
                     pass
                 self.input_entry.configure(state="normal")
@@ -1812,17 +1880,21 @@ Otherwise, interpret the request and generate appropriate SQL."""
                 self.input_entry.configure(state="normal")
                 self.input_var.set("")
                 return
-            ai_sql_clean = self._clean_sql_display(ai_sql)
+            # Parse AI response to extract explanation and SQL
+            parsed = self._parse_ai_response(ai_sql)
+            ai_sql_clean = parsed['sql']
+            explanation = parsed.get('explanation')
+            
             if not self._looks_like_sql(ai_sql_clean):
                 self._warn_once("⚠️ No SQL query detected. Try rephrasing your prompt.")
                 self.input_entry.configure(state="normal")
                 self.input_var.set("")
                 return
-            # Plain generated SQL: show user message and assistant response
+            # Plain generated SQL: show user message and assistant response with suggestion block
             self.add_chat_message("user", prompt_text)
-            self.add_chat_message("assistant", ai_sql_clean)
+            # Use _add_suggestion_block directly - it will show the assistant message with suggestion
             try:
-                self._add_suggestion_block("", ai_sql_clean)
+                self._add_suggestion_block("", ai_sql_clean, explanation=explanation)
             except Exception:
                 pass
             self.input_entry.configure(state="normal")
@@ -2040,27 +2112,25 @@ Otherwise, interpret the request and generate appropriate SQL."""
     # def _show_error(self, message):
         
     def hide_modal(self):
-        """Hide the modal and clear chat if configured."""
+        """Hide the modal without clearing conversation history."""
         if not self.is_visible or not self.modal_window:
             return
             
         self.is_visible = False
         self.chat_expanded = False
         
-        # Clear conversation history on close
-        self.conversation_history = []
-        self.chat_messages = []
-        self.suggestion_buttons = {}
-        self.inline_buttons = {}
+        # DO NOT clear conversation history - preserve it for next time
+        # self.conversation_history = []  # Preserved
+        # self.chat_messages = []  # Preserved
+        # self.suggestion_buttons = {}  # Preserved
+        # self.inline_buttons = {}  # Preserved
+        # self.session_context = []  # Preserved
         
-        # Clear chat text if it exists
-        if hasattr(self, 'chat_text'):
-            self.chat_text.delete("1.0", tk.END)
+        # DO NOT clear chat text - preserve it
+        # if hasattr(self, 'chat_text'):
+        #     self.chat_text.delete("1.0", tk.END)  # Preserved
         
-        # Reset session context
-        self.session_context = []
-        
-        # Remove all highlights
+        # Remove all highlights (this is safe)
         if hasattr(self.sql_editor, 'editor'):
             self.sql_editor.editor.tag_remove("ai_old", "1.0", tk.END)
             self.sql_editor.editor.tag_remove("ai_applied", "1.0", tk.END)
@@ -2107,6 +2177,126 @@ Otherwise, interpret the request and generate appropriate SQL."""
         """Check if modal is currently visible."""
         return self.is_visible and self.modal_window and self.modal_window.winfo_exists()
 
+    def _parse_ai_response(self, ai_response):
+        """Parse AI response to extract explanation and SQL query.
+        
+        Returns a dict with 'explanation' and 'sql' keys.
+        """
+        if not isinstance(ai_response, str):
+            return {'explanation': None, 'sql': str(ai_response) if ai_response else ''}
+        
+        text = ai_response.strip()
+        if not text:
+            return {'explanation': None, 'sql': ''}
+        
+        explanation = None
+        sql = None
+        
+        # Try to parse structured format: EXPLANATION: ... SQL_QUERY: ...
+        # Check for explanation markers (case-insensitive)
+        text_upper = text.upper()
+        if "EXPLANATION:" in text_upper:
+            # Find explanation section (try multiple case variations)
+            exp_markers = ["EXPLANATION:", "Explanation:", "explanation:", "EXPLANATION", "Explanation", "explanation"]
+            sql_markers = ["SQL_QUERY:", "SQL_QUERY", "sql_query:", "SQL:", "Sql:", "sql:", "QUERY:", "Query:", "query:"]
+            
+            for exp_marker in exp_markers:
+                # Try case-insensitive search
+                exp_pos = text_upper.find(exp_marker.upper())
+                if exp_pos != -1:
+                    # Also check exact case match for better extraction
+                    if exp_marker in text:
+                        exp_start = text.find(exp_marker) + len(exp_marker)
+                    else:
+                        exp_start = exp_pos + len(exp_marker)
+                    
+                    # Find where SQL section starts
+                    sql_start_pos = len(text)
+                    remaining_text_upper = text_upper[exp_start:]
+                    for sql_marker in sql_markers:
+                        sql_pos_upper = remaining_text_upper.find(sql_marker.upper())
+                        if sql_pos_upper != -1:
+                            sql_pos = text.find(sql_marker, exp_start)
+                            if sql_pos != -1 and sql_pos < sql_start_pos:
+                                sql_start_pos = sql_pos
+                            # Also try case-insensitive position
+                            elif sql_pos_upper != -1:
+                                sql_pos_abs = exp_start + sql_pos_upper
+                                if sql_pos_abs < sql_start_pos:
+                                    sql_start_pos = sql_pos_abs
+                    
+                    explanation = text[exp_start:sql_start_pos].strip()
+                    # Clean up explanation (remove leading/trailing dashes, colons, etc.)
+                    explanation = explanation.strip(':- \n\r\t')
+                    if explanation:
+                        break
+            
+            # Find SQL section (case-insensitive)
+            for sql_marker in sql_markers:
+                sql_pos_upper = text_upper.find(sql_marker.upper())
+                if sql_pos_upper != -1:
+                    # Try exact case first
+                    if sql_marker in text:
+                        sql_start = text.find(sql_marker) + len(sql_marker)
+                    else:
+                        sql_start = sql_pos_upper + len(sql_marker)
+                    sql = text[sql_start:].strip()
+                    if sql:
+                        break
+        
+        # If no structured format found, try to extract SQL from response
+        if not sql:
+            # Look for SQL keywords
+            lines = text.split('\n')
+            sql_lines = []
+            found_sql = False
+            explanation_lines = []
+            for line in lines:
+                line_upper = line.strip().upper()
+                # Check if this line looks like SQL
+                if any(line_upper.startswith(kw) for kw in ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'WITH']):
+                    found_sql = True
+                    sql_lines.append(line)
+                elif found_sql:
+                    # Continue collecting SQL lines
+                    sql_lines.append(line)
+                elif not found_sql and line.strip():
+                    # Before SQL starts, this might be explanation text
+                    # Skip markdown code fences and empty lines
+                    line_clean = line.strip()
+                    if (line_clean and 
+                        not line_clean.startswith('```') and 
+                        not line_clean.startswith('EXPLANATION') and
+                        not any(line_clean.upper().startswith(kw) for kw in ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER'])):
+                        explanation_lines.append(line_clean)
+            
+            # Combine explanation lines if we found any
+            if explanation_lines and not explanation:
+                explanation = ' '.join(explanation_lines).strip()
+            
+            if sql_lines:
+                sql = '\n'.join(sql_lines)
+        
+        # Clean SQL
+        if sql:
+            sql = self._clean_sql_display(sql)
+        
+        # If still no explanation but we have text before SQL, use that
+        if not explanation and sql:
+            sql_start_in_text = text.find(sql[:min(50, len(sql))]) if sql else -1
+            if sql_start_in_text > 0:
+                potential_explanation = text[:sql_start_in_text].strip()
+                # Remove common markers and clean up
+                potential_explanation = potential_explanation.replace('EXPLANATION:', '').replace('explanation:', '').strip()
+                if potential_explanation and len(potential_explanation) > 10:  # Only use if substantial
+                    explanation = potential_explanation
+        
+        # Return results
+        return {
+            'explanation': explanation if explanation and explanation.strip() else None,
+            'sql': sql or text  # Fallback to full text if no SQL extracted
+        }
+    
     def _clean_sql_display(self, sql_text):
         """Clean code fences and trailing punctuation for AI SQL responses shown inline."""
         if not isinstance(sql_text, str):
@@ -2435,7 +2625,9 @@ IMPORTANT GUIDELINES:
 3. Include appropriate JOINs when working with multiple tables
 4. Use WHERE clauses effectively for filtering
 5. Consider performance implications
-6. Return ONLY the SQL query - no markdown, no code fences, no explanations
+6. Return your response in the following format:
+   EXPLANATION: [Brief English explanation of why this query is appropriate - what it does and why we're using it]
+   SQL_QUERY: [The actual SQL query]
 7. Ensure queries end with a semicolon (;)
 8. If the user has highlighted specific query text, focus on that query
 9. Use the provided database schema to ensure accurate table and column names
@@ -2514,7 +2706,12 @@ USER REQUEST
 ═══════════════════════════════════════════════════════════════
 
 Please generate the appropriate SQL query based on the above context and user request.
-Return ONLY the SQL query, no explanations or markdown formatting.
+
+IMPORTANT: Return your response in this exact format:
+EXPLANATION: [A clear English explanation (3-4 lines) describing what this query does, why it's appropriate for the user's request, and what results it will produce. Make it informative and helpful.]
+SQL_QUERY: [The actual SQL query without markdown or code fences]
+
+The explanation is REQUIRED and helps the user understand the purpose and reasoning behind the query. Provide a detailed explanation in 3-4 lines.
 
 """)
         
@@ -2603,14 +2800,15 @@ Return ONLY the SQL query, no explanations or markdown formatting.
         except Exception:
             return text
 
-    def _add_suggestion_block(self, old_code, new_code, old_start=None, old_end=None):
+    def _add_suggestion_block(self, old_code, new_code, old_start=None, old_end=None, explanation=None):
         """Render a suggestion block using existing chat insertion. OLD may be empty."""
         try:
             suggestion_data = {
                 'old_code': old_code if old_code else None,
                 'new_code': new_code,
                 'old_start': old_start,
-                'old_end': old_end
+                'old_end': old_end,
+                'explanation': explanation
             }
             # Use assistant message with suggestion data (existing path)
             self.add_chat_message("assistant", "", suggestion_data)

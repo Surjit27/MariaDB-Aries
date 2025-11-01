@@ -18,13 +18,14 @@ class AIAssistant:
         """Create the AI assistant interface."""
         # Main AI assistant frame
         self.ai_frame = ttk.Frame(self.parent, style="AIPrompt.TFrame")
-        self.ai_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        # DISABLED: This AI assistant is deprecated - use HorizontalAIModal instead
+        # self.ai_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
         
-        # AI input bar
-        self.create_input_bar()
+        # AI input bar (disabled)
+        # self.create_input_bar()
         
-        # Show the AI assistant by default
-        # self.ai_frame.pack_forget()  # Comment out to show by default
+        # Hide the AI assistant by default (deprecated)
+        self.ai_frame.pack_forget()  # Always hide - use HorizontalAIModal instead
         
     def create_input_bar(self):
         """Create the horizontal AI input bar."""
