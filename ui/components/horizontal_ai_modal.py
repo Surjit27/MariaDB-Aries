@@ -1938,12 +1938,16 @@ CURRENT QUERY IN EDITOR:
 
 Generate a complete, executable SQL query or modification that fulfills the user's request based on the current query above."""
                 else:
+                    # Build query reference separately to avoid backslash in f-string expression
+                    query_ref = ''
+                    if current_query:
+                        query_ref = f'CURRENT QUERY IN EDITOR (for reference):\n{current_query}\n\n'
                     instruction = f"""The user has provided a natural language request to generate or modify SQL.
 Please convert this request into a valid SQL query.
 
 User Request (with normalized mentions): {norm_instruction}
 
-{('CURRENT QUERY IN EDITOR (for reference):\n' + current_query + '\n\n' if current_query else '')}Generate a complete, executable SQL query that fulfills the user's request."""
+{query_ref}Generate a complete, executable SQL query that fulfills the user's request."""
                 
                 ai_prompt = self._build_enhanced_prompt(
                     user_request=instruction,

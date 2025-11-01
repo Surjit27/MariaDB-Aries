@@ -124,5 +124,19 @@
     "status": "success",
     "database": "pokemon_world",
     "id": 18
+  },
+  {
+    "query": "SELECT * FROM battle",
+    "timestamp": "2025-11-01T23:36:59.338106",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 19
+  },
+  {
+    "query": "-- Current Database: pokemon_world\n-- Ready to execute SQL queries\n\nSELECT * FROM battle;",
+    "timestamp": "2025-11-01T23:36:59.345530",
+    "status": "success",
+    "database": "pokemon_world",
+    "id": 20
   }
 ]
